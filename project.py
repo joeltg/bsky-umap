@@ -1,21 +1,24 @@
+import os
+import sys
 import pickle
 import sqlite3
 import numpy as np
 
-import matplotlib.pyplot as plt
+from umap import UMAP
 
-import umap
-
-# DATABASE = '/Users/joelgustafson/Downloads/graph-100000.sqlite'
-DATABASE = 'graph-100000.sqlite'
-EMBEDDINGS = 'graph-100000.emb.pkl'
-
-# EMBEDDINGS = 'graph-1000.emb.pkl'
-
-dim = 32
+from graph_utils import save_csr_matrix
 
 def main():
-    conn = sqlite3.connect(DATABASE)
+    arguments = sys.argv[1:]
+    if len(arguments) == 0:
+        raise Exception("missing data directory")
+
+    directory = arguments[0]
+    database_path = os.path.join(directory, 'graph.sqlite')
+    embedding_path = os.path.join(directory, 'graph-emb.pkl')
+    neighbors_path = os.path.join(directory, 'graph-knn.pkl')
+
+    conn = sqlite3.connect(database_path)
     cursor = conn.cursor()
 
     cursor.execute('''
@@ -32,22 +35,32 @@ def main():
     );
     ''')
 
-    cursor.execute('CREATE INDEX IF NOT EXISTS edge_source ON edges(source);')
-    # cursor.execute('DELETE FROM EDGES;')
+    with open(embedding_path, 'rb') as file:
+        (node_ids, high_embeddings) = pickle.load(file)
 
-    # Unpickle the tuple
-    with open(EMBEDDINGS, 'rb') as file:
-        (names, embeddings) = pickle.load(file)
+    with open(neighbors_path, 'rb') as file:
+        (_, knn) = pickle.load(file)
 
-    reducer = umap.UMAP(verbose=True)
-    result = reducer.fit_transform(embeddings)
+    n_neighbors = knn[0].shape[1]
 
-    # print(result.shape)
-    # print(result)
+    low_embeddings, knn_graph = UMAP(
+        n_neighbors=n_neighbors,
+        precomputed_knn=knn,
+        spread=5.0,
+        min_dist=2.0,
+        # init="pca",
+        # n_epochs=0,
+        verbose=False
+    ).fit_transform(high_embeddings)
+
+    print("result.shape", low_embeddings.shape, type(low_embeddings))
+    print("node_ids", node_ids.shape)
+
+    save_csr_matrix(os.path.join(directory, 'graph-knn.sqlite'), node_ids, knn_graph)
 
     # Prepare the data for insertion
-    scale = 1000
-    data = [(int(id), float(p[0] * scale), float(p[1] * scale)) for id, p in zip(names, result)]
+    scale = 500
+    data = [(int(id), float(p[0] * scale), float(p[1] * scale)) for id, p in zip(node_ids, low_embeddings)]
 
     # Insert the data into the table
     cursor.executemany('''
@@ -55,14 +68,8 @@ def main():
         ON CONFLICT(rowid) DO UPDATE SET x = excluded.x, y = excluded.y
     ''', data)
 
-    # Commit the changes and close the connection
     conn.commit()
     conn.close()
-
-    # plt.scatter(result[:, 0], result[:, 1])
-    # plt.gca().set_aspect('equal', 'datalim')
-    # # plt.title('UMAP projection of the Penguin dataset', fontsize=24);
-    # plt.show()
 
 if __name__ == "__main__":
     main()

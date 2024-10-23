@@ -3,8 +3,66 @@ import numpy as np
 from scipy.sparse import csr_matrix
 import csrgraph as cg
 
-def edges_to_csr_matrix(db_path, edges_table='edges', nodes_table='nodes', source_col='source', target_col='target'):
-    conn = sqlite3.connect(db_path)
+edges_table='edges'
+nodes_table='nodes'
+source_col='source'
+target_col='target'
+
+def save_csr_matrix(database_path, node_ids, csrgraph):
+    coograph = csrgraph.tocoo()
+    coograph.sum_duplicates()
+    coograph.eliminate_zeros()
+
+    if coograph.shape[0] != len(node_ids) or coograph.shape[1] != len(node_ids):
+        raise Exception("unexpected matrix dimensions")
+
+    conn = sqlite3.connect(database_path)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS nodes (
+        x FLOAT NOT NULL DEFAULT 0,
+        y FLOAT NOT NULL DEFAULT 0
+    )
+    ''')
+
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS edges (
+        source INTEGER NOT NULL,
+        target INTEGER NOT NULL,
+        weight FLOAT NOT NULL
+    );
+    ''')
+
+    try:
+        conn.execute("BEGIN")
+        cursor.execute("DELETE FROM nodes")
+        cursor.execute("DELETE FROM edges")
+
+        data = [(id) for id in zip(node_ids)]
+        cursor.executemany("INSERT INTO nodes(rowid) VALUES (?)", data)
+
+        # data = [(int(node_ids[s]), int(node_ids[t])) for s, t in zip(coograph.row, coograph.col)]
+        # cursor.executemany("INSERT INTO edges(source, target) VALUES (?, ?)", data)
+
+        data = [(int(node_ids[s]), int(node_ids[t]), float(w)) for s, t, w in zip(coograph.row, coograph.col, coograph.data)]
+        cursor.executemany("INSERT INTO edges(source, target, weight) VALUES (?, ?, ?)", data)
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS edge_source ON edges(source)")
+        conn.commit()
+
+    except sqlite3.Error as e:
+        conn.rollback()
+        raise sqlite3.Error(f"SQLite error: {e}")
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def load_csr_matrix(database_path):
+    conn = sqlite3.connect(database_path)
     conn.execute('PRAGMA foreign_keys = ON')
     cursor = conn.cursor()
 
@@ -64,13 +122,3 @@ def edges_to_csr_matrix(db_path, edges_table='edges', nodes_table='nodes', sourc
     csr_graph = csr_matrix((data, indices, indptr), shape=(n, n));
 
     return cg.csrgraph(csr_graph, node_ids)
-
-# Example usage
-if __name__ == "__main__":
-    db_path = 'your_database.db'
-    try:
-        matrix = edges_to_csr_matrix(db_path)
-        print(f"CSR Matrix shape: {matrix.shape}")
-        print(f"Number of non-zero elements: {matrix.nnz}")
-    except Exception as e:
-        print(f"Error: {e}")
