@@ -14,7 +14,7 @@ def main():
         raise Exception("missing data directory")
 
     directory = arguments[0]
-    database_path = os.path.join(directory, 'graph.sqlite')
+    database_path = os.path.join(directory, 'graph-umap.sqlite')
     embedding_path = os.path.join(directory, 'graph-emb.pkl')
     neighbors_path = os.path.join(directory, 'graph-knn.pkl')
 
@@ -43,23 +43,19 @@ def main():
 
     n_neighbors = knn[0].shape[1]
 
-    low_embeddings, knn_graph = UMAP(
+    low_embeddings = UMAP(
         n_neighbors=n_neighbors,
         precomputed_knn=knn,
-        spread=5.0,
-        min_dist=2.0,
-        # init="pca",
-        # n_epochs=0,
-        verbose=False
+        spread=4,
+        min_dist=0.5,
+        verbose=True
     ).fit_transform(high_embeddings)
 
     print("result.shape", low_embeddings.shape, type(low_embeddings))
     print("node_ids", node_ids.shape)
 
-    save_csr_graph(os.path.join(directory, 'graph-knn.sqlite'), node_ids, knn_graph)
-
     # Prepare the data for insertion
-    scale = 500
+    scale = 5000
     data = [(int(id), float(p[0] * scale), float(p[1] * scale)) for id, p in zip(node_ids, low_embeddings)]
 
     # Insert the data into the table
