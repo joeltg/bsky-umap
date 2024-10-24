@@ -6,17 +6,24 @@ import numpy as np
 
 from umap import UMAP
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from graph_utils import save_csr_graph
 
 def main():
+    dim = int(os.environ['DIM'])
+    n_neighbors = int(os.environ['N_NEIGHBORS'])
+
     arguments = sys.argv[1:]
     if len(arguments) == 0:
         raise Exception("missing data directory")
 
     directory = arguments[0]
-    database_path = os.path.join(directory, 'graph-umap.sqlite')
-    embedding_path = os.path.join(directory, 'graph-emb.pkl')
-    neighbors_path = os.path.join(directory, 'graph-knn.pkl')
+    database_path = os.path.join(directory, 'graph-umap-{:d}-{:d}.sqlite'.format(dim, n_neighbors))
+    embedding_path = os.path.join(directory, 'graph-emb-{:d}.pkl'.format(dim))
+    neighbors_path = os.path.join(directory, 'graph-knn-{:d}-{:d}.pkl'.format(dim, n_neighbors))
 
     conn = sqlite3.connect(database_path)
     cursor = conn.cursor()
