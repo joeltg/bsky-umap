@@ -60,7 +60,7 @@ def save_csr_graph(database_path, node_ids, csrgraph):
 
 def load_csr_graph(database_path):
     (matrix, node_ids) = load_coo_matrix(database_path)
-    return cg.csrgraph(matrix.tocoo(), node_ids)
+    return cg.csrgraph(matrix.tocsr(), node_ids, copy=False)
 
 def load_coo_matrix(database_path):
     conn = sqlite3.connect(database_path)
