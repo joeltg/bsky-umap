@@ -6,7 +6,7 @@ import numpy as np
 
 from umap import UMAP
 
-from graph_utils import save_csr_matrix
+from graph_utils import save_csr_graph
 
 def main():
     arguments = sys.argv[1:]
@@ -56,7 +56,7 @@ def main():
     print("result.shape", low_embeddings.shape, type(low_embeddings))
     print("node_ids", node_ids.shape)
 
-    save_csr_matrix(os.path.join(directory, 'graph-knn.sqlite'), node_ids, knn_graph)
+    save_csr_graph(os.path.join(directory, 'graph-knn.sqlite'), node_ids, knn_graph)
 
     # Prepare the data for insertion
     scale = 500
