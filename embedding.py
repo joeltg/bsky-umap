@@ -24,13 +24,16 @@ def main():
 
     G = load_csr_graph(database_path)
 
-    ggvec_model = nodevectors.GGVec(
+    embeddings = nodevectors.GGVec(
         n_components=dim,
         threads=14,
         verbose=True,
-    )
+    ).fit_transform(G)
 
-    embeddings = ggvec_model.fit_transform(G)
+    # embeddings = nodevectors.ProNE(
+    #     n_components=dim,
+    #     verbose=True
+    # ).fit_transform(G)
 
     with open(embedding_path, 'wb') as file:
         pickle.dump((G.names, embeddings), file)
