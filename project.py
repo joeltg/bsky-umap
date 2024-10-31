@@ -15,6 +15,7 @@ from graph_utils import save_csr_graph
 def main():
     dim = int(os.environ['DIM'])
     n_neighbors = int(os.environ['N_NEIGHBORS'])
+    n_epochs = int(os.environ['N_EPOCHS'])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -30,8 +31,10 @@ def main():
 
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS nodes (
+        id INTEGER PRIMARY KEY NOT NULL,
         x FLOAT NOT NULL DEFAULT 0,
-        y FLOAT NOT NULL DEFAULT 0
+        y FLOAT NOT NULL DEFAULT 0,
+        mass FLOAT NOT NULL DEFAULT 0
     )
     ''')
 
@@ -55,6 +58,8 @@ def main():
         precomputed_knn=knn,
         spread=4,
         min_dist=0.5,
+        n_epochs=n_epochs,
+        n_jobs=14,
         verbose=True
     ).fit_transform(high_embeddings)
 
