@@ -11,28 +11,38 @@ if [ -z "${DIM+x}" ]; then
 fi
 
 if [ -z "${N_NEIGHBORS+x}" ]; then
-    echo "Error: N_NEIGHBORSS is not defined."
+    echo "Error: N_NEIGHBORS is not defined."
     exit 1
 fi
 
+DB=${1}/db.sqlite
+ATLAS=${1}/atlas-umap-${DIM}-${N_NEIGHBORS}.sqlite
+GRAPH=${1}/graph-umap-${DIM}-${N_NEIGHBORS}.sqlite
+
+echo "DB=${DB}"
+echo "ATLAS=${ATLAS}"
+echo "GRAPH=${GRAPH}"
+
 sqlite3 <<EOF
-    ATTACH DATABASE '${1}/db.sqlite' AS db;
-    ATTACH DATABASE '${1}/atlas-umap-${DIM}-${N_NEIGHBORS}.sqlite' as atlas;
-    ATTACH DATABASE '${1}/graph-umap-${DIM}-${N_NEIGHBORS}.sqlite' as graph;
+    ATTACH DATABASE '${DB}' AS db;
+    ATTACH DATABASE '${ATLAS}' as atlas;
+    ATTACH DATABASE '${GRAPH}' as graph;
 
-    UPDATE graph.nodes SET mass = db.users.incoming_follow_count FROM db.users WHERE db.users.id = graph.nodes.rowid;
+    UPDATE graph.nodes SET mass = db.users.incoming_follow_count FROM db.users WHERE db.users.id = graph.nodes.id;
 
-    CREATE VIRTUAL TABLE IF NOT EXISTS atlas.users USING rtree(
+    DROP TABLE IF EXISTS atlas.nodes;
+    CREATE TABLE atlas.nodes (id INTEGER PRIMARY KEY, mass INTEGER NOT NULL, label INTEGER NOT NULL);
+
+    INSERT INTO atlas.nodes(id, mass, label) SELECT id, mass, label FROM graph.nodes;
+
+    DROP TABLE IF EXISTS atlas.users;
+    CREATE VIRTUAL TABLE atlas.users USING rtree(
         id INTEGER PRIMARY KEY,
         minX INTEGER NOT NULL,
         maxX INTEGER NOT NULL,
         minY INTEGER NOT NULL,
-        maxY INTEGER NOT NULL,
-        minZ INTEGER NOT NULL,
-        maxZ INTEGER NOT NULL
+        maxY INTEGER NOT NULL
     );
 
-    DELETE FROM atlas.users;
-
-    INSERT INTO atlas.users(id, minX, maxX, minY, maxY, minZ, maxZ) SELECT rowid, x, x, y, y, mass, mass FROM graph.nodes;
+    INSERT INTO atlas.users(id, minX, maxX, minY, maxY) SELECT id, x, x, y, y FROM graph.nodes;
 EOF

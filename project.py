@@ -29,12 +29,14 @@ def main():
     conn = sqlite3.connect(database_path)
     cursor = conn.cursor()
 
+    cursor.execute("DROP TABLE IF EXISTS nodes")
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS nodes (
+    CREATE TABLE nodes (
         id INTEGER PRIMARY KEY NOT NULL,
         x FLOAT NOT NULL DEFAULT 0,
         y FLOAT NOT NULL DEFAULT 0,
-        mass FLOAT NOT NULL DEFAULT 0
+        mass FLOAT NOT NULL DEFAULT 0,
+        color FLOAT NOT NULL DEFAULT 0
     )
     ''')
 
@@ -54,6 +56,7 @@ def main():
     n_neighbors = knn[0].shape[1]
 
     low_embeddings = UMAP(
+        # n_components=3,
         n_neighbors=n_neighbors,
         precomputed_knn=knn,
         spread=4,
@@ -67,14 +70,11 @@ def main():
     print("node_ids", node_ids.shape)
 
     # Prepare the data for insertion
-    scale = 5000
+    scale = 20000
     data = [(int(id), float(p[0] * scale), float(p[1] * scale)) for id, p in zip(node_ids, low_embeddings)]
 
     # Insert the data into the table
-    cursor.executemany('''
-    INSERT INTO nodes (rowid, x, y) VALUES (?, ?, ?)
-        ON CONFLICT(rowid) DO UPDATE SET x = excluded.x, y = excluded.y
-    ''', data)
+    cursor.executemany("INSERT INTO nodes (id, x, y) VALUES (?, ?, ?)", data)
 
     conn.commit()
     conn.close()

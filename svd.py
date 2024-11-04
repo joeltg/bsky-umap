@@ -1,79 +1,55 @@
+import sys
+import os
+
+import pickle
 import numpy as np
 from scipy import sparse
 from sklearn.decomposition import TruncatedSVD
-import sqlite3
+import matplotlib.pyplot as plt
+from scipy import stats
 
-# Constants
-N_NODES = 100_000
-N_COMPONENTS = 1000
-DATABASE = '/Users/joelgustafson/Downloads/graph-100000.sqlite'
+from dotenv import load_dotenv
+load_dotenv()
 
-def load_matrix(cursor, shape, batch_size=10000):
-    # Create an empty LIL matrix
-    matrix = sparse.lil_matrix(shape)
-
-    # Fetch and add edges in batches
-    offset = 0
-    while True:
-        cursor.execute("""
-            SELECT source, target
-            FROM edges
-            LIMIT ? OFFSET ?
-        """, (batch_size, offset))
-
-        batch = cursor.fetchall()
-        if not batch:
-            break
-
-        # print("got batch", batch)
-
-        # Add edges to the matrix
-        for source, target in batch:
-            matrix[source-1, target-1] = 1
-
-        offset += batch_size
-        print(f"Processed {offset} edges")
-
-    # Convert to CSR format for efficient computations
-    return matrix.tocsr()
+from plot_distribution import plot_distribution
+from graph_utils import save_colors
 
 def main():
-    # Connect to SQLite database
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
+    dim = int(os.environ['DIM'])
+    n_neighbors = int(os.environ['N_NEIGHBORS'])
 
+    arguments = sys.argv[1:]
+    if len(arguments) == 0:
+        raise Exception("missing data directory")
 
-    print("Loading data...")
-    adj_matrix = load_matrix(cursor, shape=(N_NODES,N_NODES))
+    directory = arguments[0]
+    embedding_path = os.path.join(directory, 'graph-emb-{:d}.pkl'.format(dim))
+    database_path = os.path.join(directory, 'graph-umap-{:d}-{:d}.sqlite'.format(dim, n_neighbors))
 
-    # edges = load_data(cursor)
-    # conn.close()
+    with open(embedding_path, 'rb') as file:
+        (node_ids, embeddings) = pickle.load(file)
 
-    # print("Creating sparse matrix...")
-    # adj_matrix = create_sparse_matrix(edges, (N_NODES, N_NODES))
-
-    print("Sparse matrix created. Shape:", adj_matrix.shape)
-    print("Number of non-zero elements:", adj_matrix.nnz)
-    print("Sparsity: {:.6f}%".format(100 * adj_matrix.nnz / (N_NODES * N_NODES)))
-
-    n_components = 100
+    print("node_ids:", type(node_ids), node_ids.shape)
+    print("embeddings:", type(embeddings), embeddings.shape)
 
     print("Performing Truncated SVD (equivalent to PCA for this case)...")
-    svd = TruncatedSVD(n_components=n_components, random_state=42)
-    transformed_data = svd.fit_transform(adj_matrix)
+    svd = TruncatedSVD(n_components=1, random_state=42)
+    components = svd.fit_transform(embeddings)
 
     print("SVD completed.")
-    print("Transformed data shape:", transformed_data.shape)
-    # print("Transformed data:", transformed_data)
+    print("Transformed data shape:", type(components), components.shape)
 
-    # # The right singular vectors are equivalent to the PCA components
-    # components = svd.components_
+    hues = stats.norm.cdf(components, loc=np.mean(components), scale=np.std(components))  # -> uniform 0-1
+    # hues = (hues * 255).astype(np.uint8)  # -> uniform 0-255
 
-    # # Optionally, you can save the results
-    # np.save('pca_components.npy', components)
-    # np.save('transformed_data.npy', transformed_data)
+    # min = components.min();
+    # max = components.max();
+    # hues = np.clip(((components - min) / (max - min) * 255), 0, 255).astype(np.uint8)
 
-    # print("Results saved. Process complete.")
+    print("got hues:", type(hues), hues.shape)
+
+    plot_distribution(hues)
+    # save_colors(database_path, node_ids, hues)
 
 if __name__ == "__main__":
     main()
