@@ -194,20 +194,32 @@ def main():
     print("labels:", type(labels), labels)
     print("cluster_centers:", type(cluster_centers), cluster_centers.shape)
 
-    (cluster_hues, nbrs) = derive_cluster_hues(labels=labels, cluster_centers=cluster_centers)
+    log_frequency = 10000
+    method = 'nearest_two'
+    n_cycles = 5
+
+    (cluster_hues, nbrs) = derive_cluster_hues(
+        labels=labels,
+        cluster_centers=cluster_centers,
+        n_cycles=n_cycles
+    )
 
     print("cluster_hues:", type(cluster_hues))
 
-    # hues = [int(cluster_hues[label] * 256) for label in labels]
-    # hues = [int(interpolate_point_hue(point, cluster_centers, cluster_hues, 'nearest_two', nbrs) * 256) for point in embeddings]
-
-    log_frequency = 10000
-    method = 'neighbors'
     n_samples = len(embeddings)
     hues = np.zeros(n_samples, dtype=np.int32)
 
     for i in range(n_samples):
-        hues[i] = int(interpolate_point_hue(embeddings[i], cluster_centers, cluster_hues, method, nbrs) * 256)
+        hue = interpolate_point_hue(
+            point=embeddings[i],
+            cluster_centers=cluster_centers,
+            cluster_hues=cluster_hues,
+            method=method,
+            nbrs=nbrs,
+            n_cycles=n_cycles
+        )
+
+        hues[i] = int(hue * 256)
 
         if (i + 1) % log_frequency == 0:
             print(f"Processed {i + 1}/{n_samples} points ({((i + 1) / n_samples) * 100:.1f}%)")
