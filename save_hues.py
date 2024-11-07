@@ -191,15 +191,26 @@ def main():
     with open(label_path, 'rb') as file:
         (node_ids, labels, cluster_centers) = pickle.load(file)
 
-    print("labels:", type(labels), labels.shape)
+    print("labels:", type(labels), labels)
     print("cluster_centers:", type(cluster_centers), cluster_centers.shape)
 
     (cluster_hues, nbrs) = derive_cluster_hues(labels=labels, cluster_centers=cluster_centers)
 
     print("cluster_hues:", type(cluster_hues))
 
-    hues = [int(cluster_hues[label] * 256) for label in labels]
+    # hues = [int(cluster_hues[label] * 256) for label in labels]
     # hues = [int(interpolate_point_hue(point, cluster_centers, cluster_hues, 'nearest_two', nbrs) * 256) for point in embeddings]
+
+    log_frequency = 10000
+    method = 'neighbors'
+    n_samples = len(embeddings)
+    hues = np.zeros(n_samples, dtype=np.int32)
+
+    for i in range(n_samples):
+        hues[i] = int(interpolate_point_hue(embeddings[i], cluster_centers, cluster_hues, method, nbrs) * 256)
+
+        if (i + 1) % log_frequency == 0:
+            print(f"Processed {i + 1}/{n_samples} points ({((i + 1) / n_samples) * 100:.1f}%)")
 
     save_labels(graph_database_path, node_ids, hues)
     save_labels(atlas_database_path, node_ids, hues)

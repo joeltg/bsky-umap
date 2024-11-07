@@ -131,8 +131,6 @@ def save_labels(database_path, node_ids, labels):
     conn = sqlite3.connect(database_path)
     cursor = conn.cursor()
 
-    print("labels:", type(labels), labels.shape)
-
     try:
         conn.execute("BEGIN")
         data = [(int(label), id) for id, label in zip(node_ids, labels)]
