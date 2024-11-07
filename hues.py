@@ -221,7 +221,7 @@ def main():
 
     cluster_hues = derive_cluster_hues(labels=labels, cluster_centers=cluster_centers)
 
-    hues = [interpolate_point_hue(point, cluster_centers, cluster_hues) for point in embeddings]
+    hues = [int(interpolate_point_hue(point, cluster_centers, cluster_hues) * 256) for point in embeddings]
 
     save_labels(graph_database_path, node_ids, hues)
     save_labels(atlas_database_path, node_ids, hues)
