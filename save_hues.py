@@ -12,17 +12,20 @@ load_dotenv()
 
 from graph_utils import save_labels
 
-def derive_cluster_hues(labels, cluster_centers):
+import numpy as np
+from sklearn.neighbors import NearestNeighbors
+
+def derive_cluster_hues(labels, cluster_centers, n_neighbors=15):
     """
-    Derive hues (0-1) for clusters using MDS-style method on cluster connectivity.
+    Derive hues (0-1) for clusters using MDS-style method on approximate neighbors.
 
     Parameters:
-    embeddings: ndarray of shape (n_samples, n_features)
-        The input data points
     labels: ndarray of shape (n_samples,)
         Cluster labels for each point
     cluster_centers: ndarray of shape (n_clusters, n_features)
         Coordinates of cluster centers
+    n_neighbors: int
+        Number of neighbors to consider for each cluster
 
     Returns:
     ndarray of shape (n_clusters,)
@@ -31,22 +34,25 @@ def derive_cluster_hues(labels, cluster_centers):
     # Get number of clusters
     n_clusters = len(cluster_centers)
 
-    # Find cluster neighbors using Voronoi tessellation
-    vor = Voronoi(cluster_centers)
+    # Use NearestNeighbors instead of Voronoi
+    nbrs = NearestNeighbors(n_neighbors=n_neighbors, metric='euclidean')
+    nbrs.fit(cluster_centers)
+    distances, indices = nbrs.kneighbors(cluster_centers)
 
-    # Create adjacency matrix from Voronoi ridge points
+    # Create adjacency matrix from nearest neighbors
     adjacency = np.zeros((n_clusters, n_clusters))
-    for ridge_points in vor.ridge_points:
-        i, j = ridge_points
-        adjacency[i, j] = 1
-        adjacency[j, i] = 1
+    for i, neighbors in enumerate(indices):
+        for j in neighbors[1:]:  # Skip first neighbor (self)
+            adjacency[i, j] = 1
+            adjacency[j, i] = 1
 
-    # Get shortest path distances between all clusters
-    distances = shortest_path(adjacency)
-
-    # Convert distances to similarities
-    max_dist = np.max(distances[distances != np.inf])
-    similarities = 1 - (distances / max_dist)
+    # Convert adjacency to similarities
+    # Use Gaussian kernel on distances
+    similarities = np.zeros((n_clusters, n_clusters))
+    sigma = np.median(distances[:, 1])  # Use median distance to first neighbor
+    for i in range(n_clusters):
+        dists = np.linalg.norm(cluster_centers - cluster_centers[i], axis=1)
+        similarities[i] = np.exp(-dists**2 / (2 * sigma**2))
 
     # Center the similarity matrix
     n = len(similarities)
@@ -60,12 +66,9 @@ def derive_cluster_hues(labels, cluster_centers):
     # Normalize to [0,1] range
     hue_values = (hue_values - np.min(hue_values)) / (np.max(hue_values) - np.min(hue_values))
 
-    return hue_values
+    return hue_values, nbrs
 
-
-voronoi_cache = None
-
-def interpolate_point_hue(point, cluster_centers, cluster_hues, method='voronoi_neighbors'):
+def interpolate_point_hue(point, cluster_centers, cluster_hues, method='nearest_two', nbrs=None):
     """
     Interpolate a hue value for a point based on nearby cluster hues.
 
@@ -77,57 +80,31 @@ def interpolate_point_hue(point, cluster_centers, cluster_hues, method='voronoi_
     cluster_hues: ndarray of shape (n_clusters,)
         Base hue value (0-1) for each cluster
     method: str
-        'nearest_two' or 'inverse_distance'
+        'nearest_two', 'inverse_distance', or 'neighbors'
+    nbrs: NearestNeighbors, optional
+        Pre-fitted NearestNeighbors model for cluster centers
 
     Returns:
     float
         Interpolated hue value (0-1)
     """
-    global voronoi_cache
+    if method == 'neighbors':
+        if nbrs is None:
+            raise ValueError("neighbors method requires a fitted NearestNeighbors model")
 
-    # Calculate distances to all cluster centers
-    distances = np.linalg.norm(cluster_centers - point, axis=1)
-    if method == 'voronoi_neighbors':
-        # Create or use cached Voronoi diagram and neighbor dictionary
-        if voronoi_cache is None:
-            vor = Voronoi(cluster_centers)
-            # Create dictionary of neighbors for each center
-            neighbor_dict = {}
-            for ridge_points in vor.ridge_points:
-                i, j = ridge_points
-                if i not in neighbor_dict:
-                    neighbor_dict[i] = set()
-                if j not in neighbor_dict:
-                    neighbor_dict[j] = set()
-                neighbor_dict[i].add(j)
-                neighbor_dict[j].add(i)
-            voronoi_cache = (vor, neighbor_dict)
-        else:
-            vor, neighbor_dict = voronoi_cache
-
-        # Find nearest cluster center
-        distances = np.linalg.norm(cluster_centers - point, axis=1)
-        nearest_center_idx = np.argmin(distances)
-
-        # Get its Voronoi neighbors
-        neighbor_indices = list(neighbor_dict[nearest_center_idx])
-
-        # Calculate distances to nearest center and its neighbors
-        relevant_centers = [nearest_center_idx] + neighbor_indices
-        relevant_distances = np.linalg.norm(
-            cluster_centers[relevant_centers] - point[:, np.newaxis].T,
-            axis=1
-        )
+        # Find nearest cluster center and its neighbors
+        distances, indices = nbrs.kneighbors([point], n_neighbors=5)
+        distances = distances[0]
+        indices = indices[0]
 
         # Convert distances to weights using inverse distance
-        weights = 1 / (relevant_distances + 1e-8)
+        weights = 1 / (distances + 1e-8)
         weights = weights / np.sum(weights)
 
         # Get weighted average of hues from neighboring centers
-        relevant_hues = cluster_hues[relevant_centers]
+        relevant_hues = cluster_hues[indices]
 
-        # Handle wraparound in hue space by finding the best wrapping
-        # First, center all hues around the nearest center's hue
+        # Handle wraparound in hue space
         center_hue = relevant_hues[0]
         wrapped_hues = relevant_hues.copy()
         for i in range(1, len(wrapped_hues)):
@@ -138,11 +115,14 @@ def interpolate_point_hue(point, cluster_centers, cluster_hues, method='voronoi_
                 else:
                     wrapped_hues[i] += 1
 
-        # Compute weighted average and wrap back to [0,1]
         interpolated_hue = (np.sum(wrapped_hues * weights)) % 1.0
 
         return interpolated_hue
+
     elif method == 'nearest_two':
+        # Calculate distances to all cluster centers
+        distances = np.linalg.norm(cluster_centers - point, axis=1)
+
         # Get two nearest clusters
         closest_indices = np.argsort(distances)[:2]
         d1, d2 = distances[closest_indices]
@@ -160,31 +140,26 @@ def interpolate_point_hue(point, cluster_centers, cluster_hues, method='voronoi_
         hue2 = cluster_hues[closest_indices[1]]
 
         # Handle wraparound in hue space
-        # If hues are more than 0.5 apart, wrap around the other way
         if abs(hue2 - hue1) > 0.5:
             if hue2 > hue1:
                 hue2 -= 1
             else:
                 hue2 += 1
 
-        # Interpolate and wrap back to [0,1]
         interpolated_hue = (hue1 * (1 - weight) + hue2 * weight) % 1.0
 
     elif method == 'inverse_distance':
-        # Prevent division by zero
-        eps = 1e-8
-        weights = 1 / (distances + eps)
+        # Calculate distances to all cluster centers
+        distances = np.linalg.norm(cluster_centers - point, axis=1)
 
-        # Normalize weights
+        # Prevent division by zero
+        weights = 1 / (distances + 1e-8)
         weights = weights / np.sum(weights)
 
-        # Weighted average of hues
-        # Note: this simple weighted average doesn't handle wraparound
-        # as well as the two-point interpolation
         interpolated_hue = np.sum(cluster_hues * weights) % 1.0
 
     else:
-        raise Exception("expected method to be 'voronoi_neighbors', 'nearest_two', or 'inverse_distance'")
+        raise Exception("oh no")
 
     return interpolated_hue
 
@@ -219,9 +194,9 @@ def main():
     print("labels:", type(labels), labels.shape)
     print("cluster_centers:", type(cluster_centers), cluster_centers.shape)
 
-    cluster_hues = derive_cluster_hues(labels=labels, cluster_centers=cluster_centers)
+    (cluster_hues, nbrs) = derive_cluster_hues(labels=labels, cluster_centers=cluster_centers)
 
-    hues = [int(interpolate_point_hue(point, cluster_centers, cluster_hues) * 256) for point in embeddings]
+    hues = [int(interpolate_point_hue(point, cluster_centers, cluster_hues, 'nearest_two', nbrs) * 256) for point in embeddings]
 
     save_labels(graph_database_path, node_ids, hues)
     save_labels(atlas_database_path, node_ids, hues)
