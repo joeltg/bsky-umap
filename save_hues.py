@@ -196,7 +196,7 @@ def main():
 
     (cluster_hues, nbrs) = derive_cluster_hues(labels=labels, cluster_centers=cluster_centers)
 
-    print("cluster_hues:", type(cluster_hues), cluster_hues.shape)
+    print("cluster_hues:", type(cluster_hues))
 
     hues = [int(cluster_hues[label] * 256) for label in labels]
     # hues = [int(interpolate_point_hue(point, cluster_centers, cluster_hues, 'nearest_two', nbrs) * 256) for point in embeddings]
