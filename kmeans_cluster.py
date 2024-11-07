@@ -45,11 +45,15 @@ def main():
 
     labels = clusterer.labels_
     print("labels", type(labels), labels.shape)
+
+    cluster_centers = clusterer.cluster_centers_
+    print("cluster_centers", type(cluster_centers), cluster_centers.shape)
+
     # probabilities = clusterer.probabilities_
     # print("probabilities", type(probabilities), probabilities.shape)
 
     with open(label_path, 'wb') as file:
-        pickle.dump((node_ids, labels), file)
+        pickle.dump((node_ids, labels, cluster_centers), file)
 
     # plot_distribution(hues)
     # save_colors(database_path, node_ids, hues)
