@@ -3,7 +3,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 from scipy import stats
 
-matplotlib.use('TkAgg')  # or 'Qt5Agg' if you have Qt installed
+matplotlib.use('TkAgg')
+# matplotlib.use('Qt5Agg')
 
 def plot_distribution(values, bins=100):
     """

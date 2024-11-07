@@ -25,6 +25,7 @@ def main():
     database_path = os.path.join(directory, 'graph-umap-{:d}-{:d}.sqlite'.format(dim, n_neighbors))
     embedding_path = os.path.join(directory, 'graph-emb-{:d}.pkl'.format(dim))
     neighbors_path = os.path.join(directory, 'graph-knn-{:d}-{:d}.pkl'.format(dim, n_neighbors))
+    output_path = os.path.join(directory, 'graph-umap-{:d}-{:d}.pkl'.format(dim, n_neighbors))
 
     conn = sqlite3.connect(database_path)
     cursor = conn.cursor()
@@ -68,6 +69,9 @@ def main():
 
     print("result.shape", low_embeddings.shape, type(low_embeddings))
     print("node_ids", node_ids.shape)
+
+    with open(output_path, 'wb') as file:
+        pickle.dump((node_ids, low_embeddings), file)
 
     # Prepare the data for insertion
     scale = 20000
