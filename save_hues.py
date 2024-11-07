@@ -15,7 +15,7 @@ from graph_utils import save_labels
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
-def derive_cluster_hues(labels, cluster_centers, n_neighbors=15):
+def derive_cluster_hues(labels, cluster_centers, n_neighbors=15, n_cycles=1):
     """
     Derive hues (0-1) for clusters using MDS-style method on approximate neighbors.
 
@@ -63,12 +63,13 @@ def derive_cluster_hues(labels, cluster_centers, n_neighbors=15):
     eigenvalues, eigenvectors = np.linalg.eigh(centered_similarities)
     hue_values = eigenvectors[:, -1]
 
-    # Normalize to [0,1] range
+    # Normalize to [0,1] range, then multiply by n_cycles
     hue_values = (hue_values - np.min(hue_values)) / (np.max(hue_values) - np.min(hue_values))
+    hue_values = (hue_values * n_cycles) % 1.0
 
     return hue_values, nbrs
 
-def interpolate_point_hue(point, cluster_centers, cluster_hues, method='nearest_two', nbrs=None):
+def interpolate_point_hue(point, cluster_centers, cluster_hues, method='nearest_two', nbrs=None, n_cycles=1):
     """
     Interpolate a hue value for a point based on nearby cluster hues.
 
@@ -104,16 +105,20 @@ def interpolate_point_hue(point, cluster_centers, cluster_hues, method='nearest_
         # Get weighted average of hues from neighboring centers
         relevant_hues = cluster_hues[indices]
 
-        # Handle wraparound in hue space
+        # Handle wraparound in hue space with n_cycles
         center_hue = relevant_hues[0]
         wrapped_hues = relevant_hues.copy()
         for i in range(1, len(wrapped_hues)):
             diff = wrapped_hues[i] - center_hue
-            if abs(diff) > 0.5:
-                if diff > 0:
-                    wrapped_hues[i] -= 1
-                else:
-                    wrapped_hues[i] += 1
+            # Consider wrapping in either direction
+            possible_diffs = [
+                diff,  # no wrap
+                diff + 1/n_cycles,  # wrap one way
+                diff - 1/n_cycles   # wrap other way
+            ]
+            # Use the smallest absolute difference
+            best_diff = possible_diffs[np.argmin(np.abs(possible_diffs))]
+            wrapped_hues[i] = center_hue + best_diff
 
         interpolated_hue = (np.sum(wrapped_hues * weights)) % 1.0
 
@@ -127,7 +132,6 @@ def interpolate_point_hue(point, cluster_centers, cluster_hues, method='nearest_
         closest_indices = np.argsort(distances)[:2]
         d1, d2 = distances[closest_indices]
 
-        # Edge case: point exactly on a cluster center
         if d1 == 0:
             return cluster_hues[closest_indices[0]]
 
@@ -139,24 +143,20 @@ def interpolate_point_hue(point, cluster_centers, cluster_hues, method='nearest_
         hue1 = cluster_hues[closest_indices[0]]
         hue2 = cluster_hues[closest_indices[1]]
 
-        # Handle wraparound in hue space
-        if abs(hue2 - hue1) > 0.5:
-            if hue2 > hue1:
-                hue2 -= 1
-            else:
-                hue2 += 1
+        # Handle wraparound with n_cycles
+        # Consider all possible paths between the hues
+        diff = hue2 - hue1
+        possible_diffs = [
+            diff,  # no wrap
+            diff + 1/n_cycles,  # wrap one way
+            diff - 1/n_cycles   # wrap other way
+        ]
+        # Use the smallest absolute difference
+        diff = possible_diffs[np.argmin(np.abs(possible_diffs))]
 
-        interpolated_hue = (hue1 * (1 - weight) + hue2 * weight) % 1.0
+        interpolated_hue = (hue1 + diff * weight) % 1.0
 
-    elif method == 'inverse_distance':
-        # Calculate distances to all cluster centers
-        distances = np.linalg.norm(cluster_centers - point, axis=1)
-
-        # Prevent division by zero
-        weights = 1 / (distances + 1e-8)
-        weights = weights / np.sum(weights)
-
-        interpolated_hue = np.sum(cluster_hues * weights) % 1.0
+        return interpolated_hue
 
     else:
         raise Exception("oh no")
