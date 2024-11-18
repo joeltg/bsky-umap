@@ -31,9 +31,9 @@ sqlite3 <<EOF
     UPDATE graph.nodes SET mass = db.users.incoming_follow_count FROM db.users WHERE db.users.id = graph.nodes.id;
 
     DROP TABLE IF EXISTS atlas.nodes;
-    CREATE TABLE atlas.nodes (id INTEGER PRIMARY KEY, mass INTEGER NOT NULL, label INTEGER NOT NULL);
+    CREATE TABLE atlas.nodes (id INTEGER PRIMARY KEY, mass INTEGER NOT NULL, color INTEGER NOT NULL);
 
-    INSERT INTO atlas.nodes(id, mass, label) SELECT id, mass, label FROM graph.nodes;
+    INSERT INTO atlas.nodes(id, mass, color) SELECT id, mass, color FROM graph.nodes;
 
     DROP TABLE IF EXISTS atlas.users;
     CREATE VIRTUAL TABLE atlas.users USING rtree(
