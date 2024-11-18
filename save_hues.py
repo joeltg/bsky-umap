@@ -10,7 +10,7 @@ from scipy import stats
 from dotenv import load_dotenv
 load_dotenv()
 
-from graph_utils import save_labels
+from graph_utils import save_colors
 
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
@@ -195,7 +195,7 @@ def main():
     print("cluster_centers:", type(cluster_centers), cluster_centers.shape)
 
     log_frequency = 10000
-    method = 'nearest_two'
+    method = 'neighbors'
     n_cycles = 5
 
     (cluster_hues, nbrs) = derive_cluster_hues(
@@ -224,8 +224,8 @@ def main():
         if (i + 1) % log_frequency == 0:
             print(f"Processed {i + 1}/{n_samples} points ({((i + 1) / n_samples) * 100:.1f}%)")
 
-    save_labels(graph_database_path, node_ids, hues)
-    save_labels(atlas_database_path, node_ids, hues)
+    save_colors(graph_database_path, node_ids, hues)
+    save_colors(atlas_database_path, node_ids, hues)
 
 if __name__ == "__main__":
     main()

@@ -11,7 +11,7 @@ import hdbscan
 from dotenv import load_dotenv
 load_dotenv()
 
-from graph_utils import save_labels
+from graph_utils import save_colors
 
 def main():
     dim = int(os.environ['DIM'])
@@ -38,8 +38,8 @@ def main():
     print("labels:", type(labels), labels.shape)
     # print("probabilities:", type(probabilities), probabilities.shape)
 
-    save_labels(graph_database_path, node_ids, labels)
-    save_labels(atlas_database_path, node_ids, labels)
+    save_colors(graph_database_path, node_ids, labels)
+    save_colors(atlas_database_path, node_ids, labels)
 
 if __name__ == "__main__":
     main()

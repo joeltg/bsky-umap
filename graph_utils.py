@@ -8,8 +8,6 @@ nodes_table='nodes'
 source_col='source'
 target_col='target'
 
-
-
 def save_csr_graph(database_path, node_ids, csrgraph):
     coograph = csrgraph.tocoo()
     coograph.sum_duplicates()
@@ -27,7 +25,7 @@ def save_csr_graph(database_path, node_ids, csrgraph):
         id INTEGER PRIMARY KEY,
         x FLOAT NOT NULL DEFAULT 0,
         y FLOAT NOT NULL DEFAULT 0,
-        mass FLOAT NOT NULL DEFAULT 0,
+        mass INTEGER NOT NULL DEFAULT 0,
         color INTEGER NOT NULL DEFAULT 0
     )
     ''')
@@ -35,8 +33,7 @@ def save_csr_graph(database_path, node_ids, csrgraph):
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS edges (
         source INTEGER NOT NULL,
-        target INTEGER NOT NULL,
-        weight FLOAT NOT NULL
+        target INTEGER NOT NULL
     );
     ''')
 
@@ -102,39 +99,15 @@ def load_coo_matrix(database_path):
     matrix = coo_matrix((data, (rows, cols)), shape=(node_count, node_count));
     return (matrix, node_ids)
 
-
-def save_colors(database_path, node_ids, hues):
-    print("opening", database_path)
-    conn = sqlite3.connect(database_path)
-    conn.execute("PRAGMA foreign_keys = ON")
-    cursor = conn.cursor()
-
-    print("hues:", type(hues), hues.shape, type(hues[0]), hues[0].shape)
-
-    try:
-        conn.execute("BEGIN")
-        data = [(float(color), id) for id, (color,) in zip(node_ids, hues)]
-        cursor.executemany("UPDATE nodes SET color = ? WHERE rowid = ?", data)
-        conn.commit()
-
-    except sqlite3.Error as e:
-        conn.rollback()
-        raise sqlite3.Error(f"SQLite error: {e}")
-    except Exception as e:
-        conn.rollback()
-        raise e
-    finally:
-        conn.close()
-
-def save_labels(database_path, node_ids, labels):
+def save_colors(database_path, node_ids, colors):
     print("opening", database_path)
     conn = sqlite3.connect(database_path)
     cursor = conn.cursor()
 
     try:
         conn.execute("BEGIN")
-        data = [(int(label), id) for id, label in zip(node_ids, labels)]
-        cursor.executemany("UPDATE nodes SET label = ? WHERE id = ?", data)
+        data = [(int(color), id) for id, color in zip(node_ids, colors)]
+        cursor.executemany("UPDATE nodes SET color = ? WHERE id = ?", data)
         conn.commit()
 
     except sqlite3.Error as e:
