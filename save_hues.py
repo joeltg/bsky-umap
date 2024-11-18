@@ -2,18 +2,18 @@ import os
 import sys
 import pickle
 import numpy as np
+from multiprocessing import Pool, cpu_count
+from functools import partial
 from scipy.spatial import Voronoi
 from scipy.sparse.csgraph import shortest_path
 from scipy import sparse
 from scipy import stats
+from sklearn.neighbors import NearestNeighbors
 
 from dotenv import load_dotenv
 load_dotenv()
 
 from graph_utils import save_colors
-
-import numpy as np
-from sklearn.neighbors import NearestNeighbors
 
 def derive_cluster_hues(labels, cluster_centers, n_neighbors=15, n_cycles=1):
     """
@@ -67,101 +67,57 @@ def derive_cluster_hues(labels, cluster_centers, n_neighbors=15, n_cycles=1):
     hue_values = (hue_values - np.min(hue_values)) / (np.max(hue_values) - np.min(hue_values))
     hue_values = (hue_values * n_cycles) % 1.0
 
-    return hue_values, nbrs
+    return hue_values
 
-def interpolate_point_hue(point, cluster_centers, cluster_hues, method='nearest_two', nbrs=None, n_cycles=1):
-    """
-    Interpolate a hue value for a point based on nearby cluster hues.
+def interpolate_point_hue(point, cluster_centers, cluster_hues, n_cycles=1, n_neighbors=3):
+    # Calculate distances to all cluster centers
+    distances = np.linalg.norm(cluster_centers - point, axis=1)
 
-    Parameters:
-    point: ndarray of shape (n_features,)
-        Coordinates of the point
-    cluster_centers: ndarray of shape (n_clusters, n_features)
-        Coordinates of cluster centers
-    cluster_hues: ndarray of shape (n_clusters,)
-        Base hue value (0-1) for each cluster
-    method: str
-        'nearest_two', 'inverse_distance', or 'neighbors'
-    nbrs: NearestNeighbors, optional
-        Pre-fitted NearestNeighbors model for cluster centers
+    # Get two nearest clusters
+    closest_indices = np.argsort(distances)[:n_neighbors]
+    dists = distances[closest_indices]
 
-    Returns:
-    float
-        Interpolated hue value (0-1)
-    """
-    if method == 'neighbors':
-        if nbrs is None:
-            raise ValueError("neighbors method requires a fitted NearestNeighbors model")
+    if dists[0] == 0:
+        return cluster_hues[closest_indices[0]]
 
-        # Find nearest cluster center and its neighbors
-        distances, indices = nbrs.kneighbors([point], n_neighbors=5)
-        distances = distances[0]
-        indices = indices[0]
+    # Linear interpolation weight
+    weights = np.array(dists)
+    total_dist = weights.sum()
+    weights = 1 / (weights + 1e-8)
+    weights = weights / weights.sum()
 
-        # Convert distances to weights using inverse distance
-        weights = 1 / (distances + 1e-8)
-        weights = weights / np.sum(weights)
+    # Get hues of closest clusters
+    hues = cluster_hues[closest_indices]
 
-        # Get weighted average of hues from neighboring centers
-        relevant_hues = cluster_hues[indices]
+    center_hue = hues[0]
+    wrapped_hues = hues.copy()
 
-        # Handle wraparound in hue space with n_cycles
-        center_hue = relevant_hues[0]
-        wrapped_hues = relevant_hues.copy()
-        for i in range(1, len(wrapped_hues)):
-            diff = wrapped_hues[i] - center_hue
-            # Consider wrapping in either direction
-            possible_diffs = [
-                diff,  # no wrap
-                diff + 1/n_cycles,  # wrap one way
-                diff - 1/n_cycles   # wrap other way
-            ]
-            # Use the smallest absolute difference
-            best_diff = possible_diffs[np.argmin(np.abs(possible_diffs))]
-            wrapped_hues[i] = center_hue + best_diff
-
-        interpolated_hue = (np.sum(wrapped_hues * weights)) % 1.0
-
-        return interpolated_hue
-
-    elif method == 'nearest_two':
-        # Calculate distances to all cluster centers
-        distances = np.linalg.norm(cluster_centers - point, axis=1)
-
-        # Get two nearest clusters
-        closest_indices = np.argsort(distances)[:2]
-        d1, d2 = distances[closest_indices]
-
-        if d1 == 0:
-            return cluster_hues[closest_indices[0]]
-
-        # Linear interpolation weight
-        total_dist = d1 + d2
-        weight = d1 / total_dist
-
-        # Get hues of two closest clusters
-        hue1 = cluster_hues[closest_indices[0]]
-        hue2 = cluster_hues[closest_indices[1]]
-
-        # Handle wraparound with n_cycles
-        # Consider all possible paths between the hues
-        diff = hue2 - hue1
+    for i in range(1, n_neighbors):
+        diff = wrapped_hues[i] - center_hue
         possible_diffs = [
-            diff,  # no wrap
-            diff + 1/n_cycles,  # wrap one way
-            diff - 1/n_cycles   # wrap other way
+            diff,
+            diff + 1/n_cycles,
+            diff - 1/n_cycles
         ]
-        # Use the smallest absolute difference
-        diff = possible_diffs[np.argmin(np.abs(possible_diffs))]
+        best_diff = possible_diffs[np.argmin(np.abs(possible_diffs))]
+        wrapped_hues[i] = center_hue + best_diff
 
-        interpolated_hue = (hue1 + diff * weight) % 1.0
+    return (np.sum(wrapped_hues * weights)) % 1.0
 
-        return interpolated_hue
+def process_chunk(chunk_data, cluster_centers, cluster_hues, n_cycles, n_neighbors):
+    start_idx, points = chunk_data
+    chunk_hues = np.zeros(len(points), dtype=np.float32)
 
-    else:
-        raise Exception("oh no")
+    for i, point in enumerate(points):
+        chunk_hues[i] = interpolate_point_hue(
+            point=point,
+            cluster_centers=cluster_centers,
+            cluster_hues=cluster_hues,
+            n_cycles=n_cycles,
+            n_neighbors=n_neighbors
+        )
 
-    return interpolated_hue
+    return start_idx, chunk_hues
 
 def main():
     dim = int(os.environ['DIM'])
@@ -172,10 +128,10 @@ def main():
         raise Exception("missing data directory")
 
     directory = arguments[0]
-    embedding_path = os.path.join(directory, 'graph-emb-{:d}.pkl'.format(dim))
-    label_path = os.path.join(directory, 'graph-label-{:d}-{:d}.pkl'.format(dim, n_neighbors))
-    graph_database_path = os.path.join(directory, 'graph-umap-{:d}-{:d}.sqlite'.format(dim, n_neighbors))
-    atlas_database_path = os.path.join(directory, 'atlas-umap-{:d}-{:d}.sqlite'.format(dim, n_neighbors))
+    embedding_path = os.path.join(directory, f'graph-emb-{dim}.pkl')
+    label_path = os.path.join(directory, f'graph-label-{dim}-{n_neighbors}.pkl')
+    graph_database_path = os.path.join(directory, f'graph-umap-{dim}-{n_neighbors}.sqlite')
+    atlas_database_path = os.path.join(directory, f'atlas-umap-{dim}-{n_neighbors}.sqlite')
 
     print("embedding_path", embedding_path)
     print("label_path", label_path)
@@ -185,44 +141,51 @@ def main():
     with open(embedding_path, 'rb') as file:
         (node_ids, embeddings) = pickle.load(file)
 
-    print("node_ids:", type(node_ids), node_ids.shape)
-    print("embeddings:", type(embeddings), embeddings.shape)
-
     with open(label_path, 'rb') as file:
         (node_ids, labels, cluster_centers) = pickle.load(file)
 
-    print("labels:", type(labels), labels)
-    print("cluster_centers:", type(cluster_centers), cluster_centers.shape)
-
-    log_frequency = 10000
-    method = 'neighbors'
     n_cycles = 5
+    n_neighbors = 3
 
-    (cluster_hues, nbrs) = derive_cluster_hues(
+    cluster_hues = derive_cluster_hues(
         labels=labels,
         cluster_centers=cluster_centers,
         n_cycles=n_cycles
     )
 
-    print("cluster_hues:", type(cluster_hues))
-
+    # Determine number of processes and chunk size
+    n_processes = max(cpu_count() - 1, 1)
     n_samples = len(embeddings)
+    chunk_size = n_samples // (n_processes * 4)
+    print(f"Using {n_processes} processes with chunk size of {chunk_size}")
+
+    # Prepare chunks
+    chunks = []
+    for i in range(0, n_samples, chunk_size):
+        end_idx = min(i + chunk_size, n_samples)
+        chunks.append((i, embeddings[i:end_idx]))
+
+    # Prepare the partial function with fixed arguments
+    process_chunk_partial = partial(
+        process_chunk,
+        cluster_centers=cluster_centers,
+        cluster_hues=cluster_hues,
+        n_cycles=n_cycles,
+        n_neighbors=n_neighbors
+    )
+
+    # Create the final array to store results
     hues = np.zeros(n_samples, dtype=np.int32)
 
-    for i in range(n_samples):
-        hue = interpolate_point_hue(
-            point=embeddings[i],
-            cluster_centers=cluster_centers,
-            cluster_hues=cluster_hues,
-            method=method,
-            nbrs=nbrs,
-            n_cycles=n_cycles
-        )
+    # Process chunks in parallel
+    with Pool(processes=n_processes) as pool:
+        total_chunks = len(chunks)
+        for chunk_num, (start_idx, chunk_hues) in enumerate(pool.imap_unordered(process_chunk_partial, chunks)):
+            end_idx = min(start_idx + len(chunk_hues), n_samples)
+            hues[start_idx:end_idx] = (chunk_hues * 256).astype(np.int32)
 
-        hues[i] = int(hue * 256)
-
-        if (i + 1) % log_frequency == 0:
-            print(f"Processed {i + 1}/{n_samples} points ({((i + 1) / n_samples) * 100:.1f}%)")
+            if (chunk_num + 1) % max(1, total_chunks // 20) == 0:
+                print(f"Processed {chunk_num + 1}/{total_chunks} chunks ({((chunk_num + 1) / total_chunks) * 100:.1f}%)")
 
     save_colors(graph_database_path, node_ids, hues)
     save_colors(atlas_database_path, node_ids, hues)
