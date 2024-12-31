@@ -4,10 +4,7 @@ import pickle
 import numpy as np
 from multiprocessing import Pool, cpu_count
 from functools import partial
-from scipy.spatial import Voronoi
-from scipy.sparse.csgraph import shortest_path
-from scipy import sparse
-from scipy import stats
+
 from sklearn.neighbors import NearestNeighbors
 
 from dotenv import load_dotenv
@@ -34,7 +31,6 @@ def derive_cluster_hues(labels, cluster_centers, n_neighbors=15, n_cycles=1):
     # Get number of clusters
     n_clusters = len(cluster_centers)
 
-    # Use NearestNeighbors instead of Voronoi
     nbrs = NearestNeighbors(n_neighbors=n_neighbors, metric='euclidean')
     nbrs.fit(cluster_centers)
     distances, indices = nbrs.kneighbors(cluster_centers)
@@ -82,7 +78,6 @@ def interpolate_point_hue(point, cluster_centers, cluster_hues, n_cycles=1, n_ne
 
     # Linear interpolation weight
     weights = np.array(dists)
-    total_dist = weights.sum()
     weights = 1 / (weights + 1e-8)
     weights = weights / weights.sum()
 
