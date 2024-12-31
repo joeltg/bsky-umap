@@ -2,22 +2,15 @@ import sys
 import os
 
 import pickle
-import numpy as np
-from scipy import sparse
-from scipy import stats
 from sklearn.cluster import KMeans
-
-import hdbscan
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from plot_distribution import plot_distribution
-from graph_utils import save_colors
-
 def main():
     dim = int(os.environ['DIM'])
     n_neighbors = int(os.environ['N_NEIGHBORS'])
+    n_clusters = int(os.environ['N_CLUSTERS'])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -25,10 +18,7 @@ def main():
 
     directory = arguments[0]
     embedding_path = os.path.join(directory, 'graph-emb-{:d}.pkl'.format(dim))
-    # label_path = os.path.join(directory, 'graph-label-{:d}.pkl'.format(dim))
     label_path = os.path.join(directory, 'graph-label-{:d}-{:d}.pkl'.format(dim, n_neighbors))
-    # database_path = os.path.join(directory, 'graph-umap-{:d}-{:d}.sqlite'.format(dim, n_neighbors))
-    # embedding_path = os.path.join(directory, 'graph-umap-{:d}-{:d}.pkl'.format(dim, n_neighbors))
 
     with open(embedding_path, 'rb') as file:
         (node_ids, embeddings) = pickle.load(file)
@@ -38,8 +28,8 @@ def main():
 
     print("Performing k-means clustering")
     clusterer = KMeans(
-        n_clusters=1000,
-        verbose=1
+        n_clusters=n_clusters,
+        verbose=1,
     ).fit(embeddings)
     print("k-means clustering completed.")
 
@@ -49,14 +39,8 @@ def main():
     cluster_centers = clusterer.cluster_centers_
     print("cluster_centers", type(cluster_centers), cluster_centers.shape)
 
-    # probabilities = clusterer.probabilities_
-    # print("probabilities", type(probabilities), probabilities.shape)
-
     with open(label_path, 'wb') as file:
         pickle.dump((node_ids, labels, cluster_centers), file)
-
-    # plot_distribution(hues)
-    # save_colors(database_path, node_ids, hues)
 
 if __name__ == "__main__":
     main()

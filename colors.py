@@ -125,13 +125,12 @@ def main():
     directory = arguments[0]
     embedding_path = os.path.join(directory, f'graph-emb-{dim}.pkl')
     label_path = os.path.join(directory, f'graph-label-{dim}-{n_neighbors}.pkl')
-    graph_database_path = os.path.join(directory, f'graph-umap-{dim}-{n_neighbors}.sqlite')
-    atlas_database_path = os.path.join(directory, f'atlas-umap-{dim}-{n_neighbors}.sqlite')
+
+    colors_database_path = os.path.join(directory, 'colors.sqlite')
 
     print("embedding_path", embedding_path)
     print("label_path", label_path)
-    print("graph_database_path", graph_database_path)
-    print("atlas_database_path", atlas_database_path)
+    print("colors_database_path", colors_database_path)
 
     with open(embedding_path, 'rb') as file:
         (node_ids, embeddings) = pickle.load(file)
@@ -182,8 +181,7 @@ def main():
             if (chunk_num + 1) % max(1, total_chunks // 20) == 0:
                 print(f"Processed {chunk_num + 1}/{total_chunks} chunks ({((chunk_num + 1) / total_chunks) * 100:.1f}%)")
 
-    save_colors(graph_database_path, node_ids, hues)
-    save_colors(atlas_database_path, node_ids, hues)
+    save_colors(colors_database_path, node_ids, hues)
 
 if __name__ == "__main__":
     main()

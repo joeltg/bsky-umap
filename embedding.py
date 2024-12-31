@@ -1,32 +1,34 @@
 import sys
 import os
 
-import csrgraph as cg
 import nodevectors
-import numpy as np
 import pickle
+import csrgraph as cg
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from graph_utils import load_csr_graph
-
 def main():
     dim = int(os.environ['DIM'])
+    n_threads = int(os.environ['N_THREADS'])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
         raise Exception("missing data directory")
 
     directory = arguments[0]
-    database_path = os.path.join(directory, 'graph.sqlite')
+
+    matrix_path = os.path.join(directory, "graph-coo-matrix.pkl")
     embedding_path = os.path.join(directory, 'graph-emb-{:d}.pkl'.format(dim))
 
-    G = load_csr_graph(database_path)
+    with open(matrix_path, 'rb') as file:
+        (coo_matrix, node_ids) = pickle.load(file)
+
+    G = cg.csrgraph(coo_matrix.tocsr(), node_ids, copy=False)
 
     embeddings = nodevectors.GGVec(
         n_components=dim,
-        threads=14,
+        threads=n_threads,
         verbose=True,
     ).fit_transform(G)
 

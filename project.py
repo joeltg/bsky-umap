@@ -2,7 +2,6 @@ import os
 import sys
 import pickle
 import sqlite3
-import numpy as np
 
 from umap import UMAP
 
@@ -10,12 +9,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from graph_utils import save_csr_graph
-
 def main():
     dim = int(os.environ['DIM'])
     n_neighbors = int(os.environ['N_NEIGHBORS'])
     n_epochs = int(os.environ['N_EPOCHS'])
+    n_threads = int(os.environ['N_THREADS'])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -57,13 +55,12 @@ def main():
     n_neighbors = knn[0].shape[1]
 
     low_embeddings = UMAP(
-        # n_components=3,
         n_neighbors=n_neighbors,
         precomputed_knn=knn,
         spread=4,
         min_dist=0.5,
         n_epochs=n_epochs,
-        n_jobs=14,
+        n_jobs=n_threads,
         verbose=True
     ).fit_transform(high_embeddings)
 
