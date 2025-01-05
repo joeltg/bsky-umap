@@ -2,7 +2,15 @@ DATA        := ./data
 DIM         := 32
 N_NEIGHBORS := 25
 
-all: $(DATA)/directory.sqlite $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).sqlite $(DATA)/colors.sqlite $(DATA)/atlas.sqlite $(DATA)/directory.sqlite
+all: directory colors atlas graph-umap
+
+directory: $(DATA)/directory.sqlite
+
+colors: $(DATA)/colors.sqlite
+
+atlas: $(DATA)/atlas.sqlite
+
+graph-umap: $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).sqlite
 
 $(DATA)/graph.sqlite:
 	exit 1
