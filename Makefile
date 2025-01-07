@@ -25,7 +25,7 @@ $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).pkl $(DATA)/graph-umap-$(DIM)-$(N_NEIGH
 	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python project.py $(DATA)
 
 $(DATA)/graph-label-$(DIM)-$(N_NEIGHBORS).pkl: $(DATA)/graph-emb-$(DIM).pkl
-DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) N_CLUSTERS=$(N_CLUSTERS) python labels.py $(DATA)
+	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) N_CLUSTERS=$(N_CLUSTERS) python labels.py $(DATA)
 
 $(DATA)/colors.sqlite: $(DATA)/graph.sqlite $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).pkl $(DATA)/graph-label-$(DIM)-$(N_NEIGHBORS).pkl
 	sqlite3 $(DATA)/colors.sqlite 'CREATE TABLE nodes (id INTEGER PRIMARY KEY, color INTEGER NOT NULL DEFAULT 0);'
