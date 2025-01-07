@@ -1,24 +1,9 @@
 DATA        := ./data
 DIM         := 32
 N_NEIGHBORS := 25
+N_CLUSTERS  := 50
 
-all: directory colors atlas embedding knn map labels
-
-directory: $(DATA)/directory.sqlite
-
-colors: $(DATA)/colors.sqlite
-
-atlas: $(DATA)/atlas.sqlite
-
-embedding: $(DATA)/graph-emb-$(DIM).pkl
-
-knn: $(DATA)/graph-knn-$(DIM)-$(N_NEIGHBORS).pkl
-
-map: $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).sqlite
-
-labels: $(DATA)/graph-label-$(DIM)-$(N_NEIGHBORS).pkl
-
-colors: $(DATA)/colors.sqlite
+all: $(DATA)/directory.sqlite $(DATA)/colors.sqlite $(DATA)/atlas.sqlite
 
 $(DATA)/graph.sqlite:
 	exit 1
@@ -40,16 +25,16 @@ $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).pkl $(DATA)/graph-umap-$(DIM)-$(N_NEIGH
 	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python project.py $(DATA)
 
 $(DATA)/graph-label-$(DIM)-$(N_NEIGHBORS).pkl: $(DATA)/graph-emb-$(DIM).pkl
-	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) N_CLUSTERS=25 python labels.py $(DATA)
+DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) N_CLUSTERS=$(N_CLUSTERS) python labels.py $(DATA)
 
 $(DATA)/colors.sqlite: $(DATA)/graph.sqlite $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).pkl $(DATA)/graph-label-$(DIM)-$(N_NEIGHBORS).pkl
 	sqlite3 $(DATA)/colors.sqlite 'CREATE TABLE nodes (id INTEGER PRIMARY KEY, color INTEGER NOT NULL DEFAULT 0);'
 	sqlite3 $(DATA)/colors.sqlite 'ATTACH DATABASE "$(DATA)/graph.sqlite" AS graph; INSERT INTO nodes(id) SELECT rowid FROM graph.nodes;'
 	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python colors.py $(DATA)
 
-$(DATA)/atlas.sqlite: $(DATA)/graph.sqlite $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).pkl
+$(DATA)/atlas.sqlite: $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).sqlite $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).pkl
 	sqlite3 $(DATA)/atlas.sqlite 'CREATE VIRTUAL TABLE nodes USING rtree(id INTEGER PRIMARY KEY, minX FLOAT NOT NULL, maxX FLOAT NOT NULL, minY FLOAT NOT NULL, maxY FLOAT NOT NULL);'
-	sqlite3 $(DATA)/atlas.sqlite 'ATTACH DATABASE "$(DATA)/graph.sqlite" AS graph; INSERT INTO nodes(id, minX, maxX, minY, maxY) SELECT rowid, x, x, y, y FROM graph.nodes;'
+	sqlite3 $(DATA)/atlas.sqlite 'ATTACH DATABASE "$(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).sqlite" AS graph; INSERT INTO nodes(id, minX, maxX, minY, maxY) SELECT rowid, x, x, y, y FROM graph.nodes;'
 
 clean:
 	rm -f $(DATA)/atlas.sqlite
