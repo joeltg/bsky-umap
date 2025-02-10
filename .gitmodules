@@ -1,0 +1,6 @@
+[submodule "umap"]
+	path = umap
+	url = https://github.com/lmcinnes/umap.git
+[submodule "quadtree/zig-rtree"]
+	path = quadtree/zig-rtree
+	url = https://github.com/nDimensional/zig-rtree
