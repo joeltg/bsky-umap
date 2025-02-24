@@ -6,7 +6,7 @@ import numpy as np
 import csrgraph as cg
 from scipy.sparse import coo_matrix
 
-from graph_utils import read_nodes, read_edges
+from utils import read_nodes, read_edges
 
 from dotenv import load_dotenv
 load_dotenv()

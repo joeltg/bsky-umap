@@ -6,7 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from quadtree.quadtree import QuadTree
-from graph_utils import read_nodes
+from utils import read_nodes
 from dotenv import load_dotenv
 
 load_dotenv()

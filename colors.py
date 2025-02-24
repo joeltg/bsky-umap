@@ -9,7 +9,7 @@ from functools import partial
 
 from sklearn.neighbors import NearestNeighbors
 
-from graph_utils import read_nodes
+from utils import read_nodes
 
 from dotenv import load_dotenv
 load_dotenv()

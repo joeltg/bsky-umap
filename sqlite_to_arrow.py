@@ -4,7 +4,7 @@ import os
 import sqlite3
 import numpy as np
 
-from graph_utils import write_nodes, write_edges
+from utils import write_nodes, write_edges
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -54,6 +54,10 @@ def main():
             rows[i] = s
             cols[i] = t
             incoming_degrees[t] += 1
+
+            if i % 10000000 == 0:
+                progress = 100 * float(i / edge_count)
+                print(f"loaded {i} edges out of {edge_count} ({progress:.2f}%)")
 
     finally:
         conn.close()

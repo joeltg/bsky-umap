@@ -8,7 +8,7 @@ from umap import UMAP
 
 from dotenv import load_dotenv
 
-from graph_utils import write_edges
+from utils import write_edges
 
 load_dotenv()
 

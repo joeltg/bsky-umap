@@ -5,7 +5,7 @@ import sqlite3
 import numpy as np
 from numpy.typing import NDArray
 
-from graph_utils import read_nodes, read_edges
+from utils import read_nodes, read_edges
 
 from dotenv import load_dotenv
 load_dotenv()
