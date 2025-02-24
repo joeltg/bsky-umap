@@ -1,11 +1,11 @@
 DATA        := ./data
 DIM         := 32
 N_NEIGHBORS := 25
-N_CLUSTERS  := 50
+N_CLUSTERS  := 128
 
 all: $(DATA)/directory.sqlite $(DATA)/colors.buffer $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy $(DATA)/positions.sqlite
 
-init: $(DATA)/graph.sqlite $(DATA)/edges.arrow $(DATA)/nodes.arrow
+init: $(DATA)/directory.sqlite $(DATA)/edges.arrow $(DATA)/nodes.arrow
 
 embeddings: $(DATA)/high_embeddings-$(DIM).npy
 colors.buffer: $(DATA)/colors.buffer
