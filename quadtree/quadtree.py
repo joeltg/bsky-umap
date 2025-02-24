@@ -1,6 +1,7 @@
 from ctypes import CDLL, POINTER, c_int, c_float, c_void_p, byref
 import os
 import platform
+from math import isnan
 
 def get_lib_path():
     # Determine system and architecture
@@ -99,6 +100,18 @@ _lib.quadtree_get_force.argtypes = [
 ]
 _lib.quadtree_get_force.restype = None
 
+_lib.quadtree_get_nearest_body_inclusive.argtypes = [
+    c_void_p, c_float, c_float,
+    POINTER(c_float), POINTER(c_float), POINTER(c_float)
+]
+_lib.quadtree_get_nearest_body_inclusive.restype = None
+
+_lib.quadtree_get_nearest_body_exclusive.argtypes = [
+    c_void_p, c_float, c_float,
+    POINTER(c_float), POINTER(c_float), POINTER(c_float)
+]
+_lib.quadtree_get_nearest_body_exclusive.restype = None
+
 
 class QuadTree:
     """Python wrapper for the Zig Quadtree implementation."""
@@ -155,6 +168,21 @@ class QuadTree:
         _lib.quadtree_get_force(self._ptr, x, y, mass, byref(result_x), byref(result_y))
         return (result_x.value, result_y.value)
 
+    def get_nearest_body(self, position: tuple[float, float], inclusive: bool = True) -> tuple[float, float, float]:
+        """Get the nearest body."""
+        (x, y) = position
+        result_x = c_float()
+        result_y = c_float()
+        result_mass = c_float()
+        if inclusive:
+            _lib.quadtree_get_nearest_body_inclusive(self._ptr, x, y, byref(result_x), byref(result_y), byref(result_mass))
+        else:
+            _lib.quadtree_get_nearest_body_exclusive(self._ptr, x, y, byref(result_x), byref(result_y), byref(result_mass))
+
+        if isnan(result_x.value) or isnan(result_y.value) or isnan(result_mass.value):
+            raise Exception("tree is empty")
+        return (result_x.value, result_y.value, result_mass.value)
+
 # Example usage
 if __name__ == "__main__":
     # Create a quadtree centered at (0,0) with side length 100
@@ -170,6 +198,9 @@ if __name__ == "__main__":
     print("force", tree.get_force((12, 10)))
     tree.set_force_params(-2, -3)
     print("force", tree.get_force((12, 10)))
+
+    body = tree.get_nearest_body((12, 12), inclusive=False)
+    print("nearest body", body)
 
     # Remove a point
     tree.remove((10.0, 10.0), 10000)
