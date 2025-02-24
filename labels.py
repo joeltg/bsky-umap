@@ -29,6 +29,7 @@ def main():
     clusterer = KMeans(
         n_clusters=n_clusters,
         verbose=1,
+        algorithm="elkan"
     ).fit(high_embeddings)
     print("k-means clustering completed.")
 
@@ -44,9 +45,6 @@ def main():
 
     cluster_centers_path = os.path.join(directory, f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy")
     np.save(cluster_centers_path, cluster_centers)
-
-    # with open(label_path, 'wb') as file:
-    #     pickle.dump((node_ids, labels, cluster_centers), file)
 
 if __name__ == "__main__":
     main()
