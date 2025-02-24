@@ -3,22 +3,19 @@ DIM         := 32
 N_NEIGHBORS := 25
 N_CLUSTERS  := 128
 
-all: $(DATA)/directory.sqlite $(DATA)/colors.buffer $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy $(DATA)/positions.sqlite
-
 init: $(DATA)/directory.sqlite $(DATA)/edges.arrow $(DATA)/nodes.arrow
-
 embeddings: $(DATA)/high_embeddings-$(DIM).npy
-colors.buffer: $(DATA)/colors.buffer
-positions.sqlite: $(DATA)/positions.sqlite
-positions.buffer: $(DATA)/positions.buffer
+colors: $(DATA)/colors.buffer
+umap: $(DATA)/positions.sqlite
+save: $(DATA)/positions.buffer $(DATA)/atlas.sqlite
 
 $(DATA)/graph.sqlite:
 	exit 1
 
 $(DATA)/directory.sqlite: $(DATA)/graph.sqlite
-	sqlite3 $(DATA)/directory.sqlite 'CREATE TABLE users(id INTEGER PRIMARY KEY NOT NULL, did TEXT);'
-	sqlite3 $(DATA)/directory.sqlite 'CREATE INDEX user_did ON users(did);'
+	sqlite3 $(DATA)/directory.sqlite 'CREATE TABLE users(id INTEGER PRIMARY KEY NOT NULL, did TEXT NOT NULL);'
 	sqlite3 $(DATA)/directory.sqlite 'ATTACH DATABASE "$(DATA)/graph.sqlite" AS graph; INSERT INTO users(id, did) SELECT rowid, did FROM graph.nodes;'
+	sqlite3 $(DATA)/directory.sqlite 'CREATE INDEX user_did ON users(did);'
 
 $(DATA)/edges.arrow $(DATA)/nodes.arrow: $(DATA)/graph.sqlite
 	python sqlite_to_arrow.py $(DATA)
