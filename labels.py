@@ -1,7 +1,9 @@
 import sys
 import os
 
-import pickle
+import numpy as np
+from numpy.typing import NDArray
+
 from sklearn.cluster import KMeans
 
 from dotenv import load_dotenv
@@ -17,30 +19,34 @@ def main():
         raise Exception("missing data directory")
 
     directory = arguments[0]
-    embedding_path = os.path.join(directory, 'graph-emb-{:d}.pkl'.format(dim))
-    label_path = os.path.join(directory, 'graph-label-{:d}-{:d}.pkl'.format(dim, n_neighbors))
 
-    with open(embedding_path, 'rb') as file:
-        (node_ids, embeddings) = pickle.load(file)
+    high_embeddings_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
+    high_embeddings: NDArray[np.float32] = np.load(high_embeddings_path)
 
-    print("node_ids:", type(node_ids), node_ids.shape)
-    print("embeddings:", type(embeddings), embeddings.shape)
+    print("high_embeddings", high_embeddings.shape)
 
     print("Performing k-means clustering")
     clusterer = KMeans(
         n_clusters=n_clusters,
         verbose=1,
-    ).fit(embeddings)
+    ).fit(high_embeddings)
     print("k-means clustering completed.")
 
-    labels = clusterer.labels_
-    print("labels", type(labels), labels.shape)
+    cluster_labels = clusterer.labels_
+    assert cluster_labels is not None
+    print("labels", type(cluster_labels), cluster_labels.shape)
 
     cluster_centers = clusterer.cluster_centers_
     print("cluster_centers", type(cluster_centers), cluster_centers.shape)
 
-    with open(label_path, 'wb') as file:
-        pickle.dump((node_ids, labels, cluster_centers), file)
+    cluster_labels_path = os.path.join(directory, f"cluster_labels-{dim}-{n_neighbors}-{n_clusters}.npy")
+    np.save(cluster_labels_path, cluster_labels)
+
+    cluster_centers_path = os.path.join(directory, f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy")
+    np.save(cluster_centers_path, cluster_centers)
+
+    # with open(label_path, 'wb') as file:
+    #     pickle.dump((node_ids, labels, cluster_centers), file)
 
 if __name__ == "__main__":
     main()

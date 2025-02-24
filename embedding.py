@@ -1,9 +1,12 @@
 import sys
 import os
-
 import nodevectors
-import pickle
+
+import numpy as np
 import csrgraph as cg
+from scipy.sparse import coo_matrix
+
+from graph_utils import read_nodes, read_edges
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -18,13 +21,20 @@ def main():
 
     directory = arguments[0]
 
-    matrix_path = os.path.join(directory, "graph-coo-matrix.pkl")
-    embedding_path = os.path.join(directory, 'graph-emb-{:d}.pkl'.format(dim))
+    nodes_path = os.path.join(directory, "nodes.arrow")
+    (node_ids, incoming_degrees) = read_nodes(nodes_path)
 
-    with open(matrix_path, 'rb') as file:
-        (coo_matrix, node_ids) = pickle.load(file)
+    edges_path = os.path.join(directory, "edges.arrow")
+    (weights, sources, targets) = read_edges(edges_path, node_ids)
 
-    G = cg.csrgraph(coo_matrix.tocsr(), node_ids, copy=False)
+    cm = coo_matrix((weights, (sources, targets)), shape=(len(node_ids), len(node_ids)))
+
+    print("node ids", node_ids.shape)
+    print("weights", cm.data.shape)
+    print("rows", cm.row.shape)
+    print("cols", cm.col.shape)
+
+    G = cg.csrgraph(cm.tocsr(), node_ids, copy=False)
 
     embeddings = nodevectors.GGVec(
         n_components=dim,
@@ -32,13 +42,9 @@ def main():
         verbose=True,
     ).fit_transform(G)
 
-    # embeddings = nodevectors.ProNE(
-    #     n_components=dim,
-    #     verbose=True
-    # ).fit_transform(G)
-
-    with open(embedding_path, 'wb') as file:
-        pickle.dump((G.names, embeddings), file)
+    embedding_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
+    print("saving", embedding_path)
+    np.save(embedding_path, embeddings)
 
 if __name__ == "__main__":
     main()

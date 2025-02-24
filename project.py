@@ -1,11 +1,14 @@
 import os
 import sys
-import pickle
-import sqlite3
+import numpy as np
 
+from numpy.typing import NDArray
 from umap import UMAP
 
+
 from dotenv import load_dotenv
+
+from graph_utils import write_edges
 
 load_dotenv()
 
@@ -20,65 +23,36 @@ def main():
         raise Exception("missing data directory")
 
     directory = arguments[0]
-    database_path = os.path.join(directory, 'graph-umap-{:d}-{:d}.sqlite'.format(dim, n_neighbors))
-    embedding_path = os.path.join(directory, 'graph-emb-{:d}.pkl'.format(dim))
-    neighbors_path = os.path.join(directory, 'graph-knn-{:d}-{:d}.pkl'.format(dim, n_neighbors))
-    output_path = os.path.join(directory, 'graph-umap-{:d}-{:d}.pkl'.format(dim, n_neighbors))
 
-    conn = sqlite3.connect(database_path)
-    cursor = conn.cursor()
+    high_embeddings_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
+    high_embeddings: NDArray[np.float32] = np.load(high_embeddings_path)
+    knn_indices_path = os.path.join(directory, f"knn_indices-{dim}-{n_neighbors}.npy")
+    knn_indices: NDArray[np.uint32] = np.load(knn_indices_path)
+    knn_dists_path = os.path.join(directory, f"knn_dists-{dim}-{n_neighbors}.npy")
+    knn_dists: NDArray[np.float32] = np.load(knn_dists_path)
 
-    cursor.execute("DROP TABLE IF EXISTS nodes")
-    cursor.execute('''
-    CREATE TABLE nodes (
-        id INTEGER PRIMARY KEY NOT NULL,
-        x FLOAT NOT NULL DEFAULT 0,
-        y FLOAT NOT NULL DEFAULT 0,
-        mass FLOAT NOT NULL DEFAULT 0,
-        color FLOAT NOT NULL DEFAULT 0
-    )
-    ''')
-
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS edges (
-        source INTEGER NOT NULL,
-        target INTEGER NOT NULL
-    );
-    ''')
-
-    with open(embedding_path, 'rb') as file:
-        (node_ids, high_embeddings) = pickle.load(file)
-
-    with open(neighbors_path, 'rb') as file:
-        (_, knn) = pickle.load(file)
-
-    n_neighbors = knn[0].shape[1]
-
-    low_embeddings = UMAP(
+    umap = UMAP(
         n_neighbors=n_neighbors,
-        precomputed_knn=knn,
+        precomputed_knn=(knn_indices, knn_dists, None),
         spread=4,
         min_dist=0.5,
         n_epochs=n_epochs,
         n_jobs=n_threads,
         verbose=True
-    ).fit_transform(high_embeddings)
+    )
 
-    print("result.shape", low_embeddings.shape, type(low_embeddings))
-    print("node_ids", node_ids.shape)
+    # (low_embeddings, graph, sigmas, rhos) = umap.fit_transform(high_embeddings)
+    low_embeddings = umap.fit_transform(high_embeddings)
 
-    with open(output_path, 'wb') as file:
-        pickle.dump((node_ids, low_embeddings), file)
+    print("low_embeddings has shape", low_embeddings.shape)
 
-    # Prepare the data for insertion
-    scale = 20000
-    data = [(int(id), float(p[0] * scale), float(p[1] * scale)) for id, p in zip(node_ids, low_embeddings)]
+    low_embeddings_path = os.path.join(directory, f"low_embeddings-{dim}-{n_neighbors}.npy")
+    print("saving", low_embeddings_path)
+    np.save(low_embeddings_path, low_embeddings)
 
-    # Insert the data into the table
-    cursor.executemany("INSERT INTO nodes (id, x, y) VALUES (?, ?, ?)", data)
-
-    conn.commit()
-    conn.close()
+    # knn_edges_path = os.path.join(directory, f"knn_edges-{dim}-{n_neighbors}.arrow")
+    # print("saving", knn_edges_path)
+    # write_edges(knn_edges_path, (graph.data, graph.row, graph.col))
 
 if __name__ == "__main__":
     main()

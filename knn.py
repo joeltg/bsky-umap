@@ -1,7 +1,8 @@
 import sys
 import os
-import pickle
 
+import numpy as np
+from numpy.typing import NDArray
 from umap.umap_ import nearest_neighbors
 
 from dotenv import load_dotenv
@@ -18,14 +19,16 @@ def main():
         raise Exception("missing data directory")
 
     directory = arguments[0]
-    embedding_path = os.path.join(directory, 'graph-emb-{:d}.pkl'.format(dim))
-    neighbors_path = os.path.join(directory, 'graph-knn-{:d}-{:d}.pkl'.format(dim, n_neighbors))
+    high_embeddings_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
+    knn_indices_path = os.path.join(directory, f"knn_indices-{dim}-{n_neighbors}.npy")
+    knn_dists_path = os.path.join(directory, f"knn_dists-{dim}-{n_neighbors}.npy")
 
-    with open(embedding_path, 'rb') as file:
-        (node_ids, embeddings) = pickle.load(file)
+    high_embeddings: NDArray[np.float32] = np.load(high_embeddings_path)
+
+    print("loaded embeddings", high_embeddings.shape)
 
     knn = nearest_neighbors(
-        embeddings,
+        high_embeddings,
         n_neighbors=n_neighbors,
         metric="euclidean",
         metric_kwds=None,
@@ -34,9 +37,13 @@ def main():
         verbose=True,
         n_jobs=n_threads,
     )
+    print("finished nearest neighbors descent!")
+    (knn_indices, knn_dists, rp_forest) = knn
 
-    with open(neighbors_path, 'wb') as file:
-        pickle.dump((node_ids, knn), file)
+    print("saving", knn_indices_path)
+    np.save(knn_indices_path, knn_indices)
+    print("saving", knn_dists_path)
+    np.save(knn_dists_path, knn_dists)
 
 if __name__ == "__main__":
     main()

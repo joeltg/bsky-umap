@@ -1,24 +1,24 @@
 import os
 import sys
-import pickle
 import numpy as np
-from multiprocessing import Pool, cpu_count
+from numpy.typing import NDArray
+from hsluv import hsluv_to_rgb
+
+from multiprocessing import Pool
 from functools import partial
 
 from sklearn.neighbors import NearestNeighbors
 
+from graph_utils import read_nodes
+
 from dotenv import load_dotenv
 load_dotenv()
 
-from graph_utils import save_colors
-
-def derive_cluster_hues(labels, cluster_centers, n_neighbors=15, n_cycles=1):
+def derive_cluster_hues(cluster_centers: NDArray[np.float32], n_neighbors=15, n_cycles=1) -> NDArray[np.float32]:
     """
     Derive hues (0-1) for clusters using MDS-style method on approximate neighbors.
 
     Parameters:
-    labels: ndarray of shape (n_samples,)
-        Cluster labels for each point
     cluster_centers: ndarray of shape (n_clusters, n_features)
         Coordinates of cluster centers
     n_neighbors: int
@@ -65,9 +65,15 @@ def derive_cluster_hues(labels, cluster_centers, n_neighbors=15, n_cycles=1):
 
     return hue_values
 
-def interpolate_point_hue(point, cluster_centers, cluster_hues, n_cycles=1, n_neighbors=3):
+def interpolate_point_hue(
+    point: NDArray[np.float32],
+    cluster_centers: NDArray[np.float32],
+    cluster_hues: NDArray[np.float32],
+    n_cycles=1,
+    n_neighbors=3,
+):
     # Calculate distances to all cluster centers
-    distances = np.linalg.norm(cluster_centers - point, axis=1)
+    distances: NDArray[np.float32] = np.linalg.norm(cluster_centers - point, axis=1)
 
     # Get two nearest clusters
     closest_indices = np.argsort(distances)[:n_neighbors]
@@ -99,12 +105,22 @@ def interpolate_point_hue(point, cluster_centers, cluster_hues, n_cycles=1, n_ne
 
     return (np.sum(wrapped_hues * weights)) % 1.0
 
-def process_chunk(chunk_data, cluster_centers, cluster_hues, n_cycles, n_neighbors):
-    start_idx, points = chunk_data
-    chunk_hues = np.zeros(len(points), dtype=np.float32)
+def process_chunk(
+    chunk_data: tuple[int, NDArray[np.float32], NDArray[np.float32]],
+    cluster_centers: NDArray[np.float32],
+    cluster_hues: NDArray[np.float32],
+    n_cycles: int,
+    n_neighbors: int,
+):
+    start_idx, points, node_mass = chunk_data
+
+    assert len(points) == len(node_mass)
+    chunk_colors = np.zeros((len(points), 4), dtype=np.uint8)
+
+    saturation = 85
 
     for i, point in enumerate(points):
-        chunk_hues[i] = interpolate_point_hue(
+        hue = interpolate_point_hue(
             point=point,
             cluster_centers=cluster_centers,
             cluster_hues=cluster_hues,
@@ -112,52 +128,56 @@ def process_chunk(chunk_data, cluster_centers, cluster_hues, n_cycles, n_neighbo
             n_neighbors=n_neighbors
         )
 
-    return start_idx, chunk_hues
+        rgb = hsluv_to_rgb((hue * 360, saturation, node_mass[i]))
+        chunk_colors[i, :3] = np.clip(rgb, 0, 1) * 255
+        chunk_colors[i, 3] = 255
+
+    return start_idx, chunk_colors
 
 def main():
     dim = int(os.environ['DIM'])
     n_neighbors = int(os.environ['N_NEIGHBORS'])
+    n_clusters = int(os.environ['N_CLUSTERS'])
+    n_threads = int(os.environ['N_THREADS'])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
         raise Exception("missing data directory")
 
     directory = arguments[0]
-    embedding_path = os.path.join(directory, f'graph-emb-{dim}.pkl')
-    label_path = os.path.join(directory, f'graph-label-{dim}-{n_neighbors}.pkl')
 
-    colors_database_path = os.path.join(directory, 'colors.sqlite')
+    nodes_path = os.path.join(directory, "nodes.arrow")
+    (ids, incoming_degrees) = read_nodes(nodes_path)
 
-    print("embedding_path", embedding_path)
-    print("label_path", label_path)
-    print("colors_database_path", colors_database_path)
+    high_embeddings_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
+    high_embeddings: NDArray[np.float32] = np.load(high_embeddings_path)
+    print("loaded high_embeddings", high_embeddings_path, high_embeddings.shape)
 
-    with open(embedding_path, 'rb') as file:
-        (node_ids, embeddings) = pickle.load(file)
+    cluster_centers_path = os.path.join(directory, f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy")
+    cluster_centers: NDArray[np.float32] = np.load(cluster_centers_path)
+    print("loaded cluster_centers", cluster_centers_path, cluster_centers.shape)
 
-    with open(label_path, 'rb') as file:
-        (node_ids, labels, cluster_centers) = pickle.load(file)
+    incoming_degrees_norm: NDArray[np.float32] = incoming_degrees.astype(np.float32) / np.max(incoming_degrees).astype(np.float32)
+    node_mass: NDArray[np.float32] = 100 * np.sqrt(incoming_degrees_norm).astype(np.float32)
 
     n_cycles = 5
     n_neighbors = 3
 
     cluster_hues = derive_cluster_hues(
-        labels=labels,
         cluster_centers=cluster_centers,
         n_cycles=n_cycles
     )
 
     # Determine number of processes and chunk size
-    n_processes = max(cpu_count() - 1, 1)
-    n_samples = len(embeddings)
-    chunk_size = n_samples // (n_processes * 4)
-    print(f"Using {n_processes} processes with chunk size of {chunk_size}")
+    n_samples = len(high_embeddings)
+    chunk_size = n_samples // (n_threads * 4)
+    print(f"Using {n_threads} processes with chunk size of {chunk_size}")
 
     # Prepare chunks
-    chunks = []
+    chunks: list[tuple[int, NDArray[np.float32], NDArray[np.float32]]] = []
     for i in range(0, n_samples, chunk_size):
         end_idx = min(i + chunk_size, n_samples)
-        chunks.append((i, embeddings[i:end_idx]))
+        chunks.append((i, high_embeddings[i:end_idx], node_mass[i:end_idx]))
 
     # Prepare the partial function with fixed arguments
     process_chunk_partial = partial(
@@ -169,19 +189,17 @@ def main():
     )
 
     # Create the final array to store results
-    hues = np.zeros(n_samples, dtype=np.int32)
+    colors = np.zeros((n_samples, 4), dtype=np.uint8)
 
     # Process chunks in parallel
-    with Pool(processes=n_processes) as pool:
+    with Pool(processes=n_threads) as pool:
         total_chunks = len(chunks)
-        for chunk_num, (start_idx, chunk_hues) in enumerate(pool.imap_unordered(process_chunk_partial, chunks)):
-            end_idx = min(start_idx + len(chunk_hues), n_samples)
-            hues[start_idx:end_idx] = (chunk_hues * 256).astype(np.int32)
+        for chunk_num, (start_idx, chunk_colors) in enumerate(pool.imap_unordered(process_chunk_partial, chunks)):
+            end_idx = min(start_idx + len(chunk_colors), n_samples)
+            colors[start_idx:end_idx] = chunk_colors
 
-            if (chunk_num + 1) % max(1, total_chunks // 20) == 0:
-                print(f"Processed {chunk_num + 1}/{total_chunks} chunks ({((chunk_num + 1) / total_chunks) * 100:.1f}%)")
-
-    save_colors(colors_database_path, node_ids, hues)
+    colors_path = os.path.join(directory, "colors.buffer")
+    colors.tofile(colors_path)
 
 if __name__ == "__main__":
     main()

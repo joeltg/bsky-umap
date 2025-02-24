@@ -3,42 +3,52 @@ DIM         := 32
 N_NEIGHBORS := 25
 N_CLUSTERS  := 50
 
-all: $(DATA)/directory.sqlite $(DATA)/colors.sqlite $(DATA)/atlas.sqlite
+all: $(DATA)/directory.sqlite $(DATA)/colors.buffer $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy $(DATA)/positions.sqlite
+
+init: $(DATA)/graph.sqlite $(DATA)/edges.arrow $(DATA)/nodes.arrow
+
+embeddings: $(DATA)/high_embeddings-$(DIM).npy
+colors.buffer: $(DATA)/colors.buffer
+positions.sqlite: $(DATA)/positions.sqlite
+positions.buffer: $(DATA)/positions.buffer
 
 $(DATA)/graph.sqlite:
 	exit 1
 
 $(DATA)/directory.sqlite: $(DATA)/graph.sqlite
 	sqlite3 $(DATA)/directory.sqlite 'CREATE TABLE users(id INTEGER PRIMARY KEY NOT NULL, did TEXT);'
+	sqlite3 $(DATA)/directory.sqlite 'CREATE INDEX user_did ON users(did);'
 	sqlite3 $(DATA)/directory.sqlite 'ATTACH DATABASE "$(DATA)/graph.sqlite" AS graph; INSERT INTO users(id, did) SELECT rowid, did FROM graph.nodes;'
 
-$(DATA)/graph-coo-matrix.pkl: $(DATA)/graph.sqlite
-	python load_graph.py $(DATA)
+$(DATA)/edges.arrow $(DATA)/nodes.arrow: $(DATA)/graph.sqlite
+	python sqlite_to_arrow.py $(DATA)
 
-$(DATA)/graph-emb-$(DIM).pkl: $(DATA)/graph-coo-matrix.pkl
+$(DATA)/high_embeddings-$(DIM).npy: $(DATA)/nodes.arrow $(DATA)/edges.arrow
 	DIM=$(DIM) python embedding.py $(DATA)
 
-$(DATA)/graph-knn-$(DIM)-$(N_NEIGHBORS).pkl: $(DATA)/graph-emb-$(DIM).pkl
+$(DATA)/knn_indices-$(DIM)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(N_NEIGHBORS).npy: $(DATA)/high_embeddings-$(DIM).npy
 	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python knn.py $(DATA)
 
-$(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).pkl $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).sqlite: $(DATA)/graph-knn-$(DIM)-$(N_NEIGHBORS).pkl $(DATA)/graph-emb-$(DIM).pkl
+$(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy: $(DATA)/high_embeddings-$(DIM).npy $(DATA)/knn_indices-$(DIM)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(N_NEIGHBORS).npy
 	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python project.py $(DATA)
 
-$(DATA)/graph-label-$(DIM)-$(N_NEIGHBORS).pkl: $(DATA)/graph-emb-$(DIM).pkl
+$(DATA)/positions.buffer: $(DATA)/positions.sqlite $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy
+	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python anneal.py $(DATA)
+
+$(DATA)/positions.sqlite: $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy
+	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python save_graph.py $(DATA)
+
+$(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy: $(DATA)/high_embeddings-$(DIM).npy
 	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) N_CLUSTERS=$(N_CLUSTERS) python labels.py $(DATA)
 
-$(DATA)/colors.sqlite: $(DATA)/graph.sqlite $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).pkl $(DATA)/graph-label-$(DIM)-$(N_NEIGHBORS).pkl
-	sqlite3 $(DATA)/colors.sqlite 'CREATE TABLE nodes (id INTEGER PRIMARY KEY, color INTEGER NOT NULL DEFAULT 0);'
-	sqlite3 $(DATA)/colors.sqlite 'ATTACH DATABASE "$(DATA)/graph.sqlite" AS graph; INSERT INTO nodes(id) SELECT rowid FROM graph.nodes;'
-	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python colors.py $(DATA)
+$(DATA)/colors.buffer: $(DATA)/nodes.arrow $(DATA)/high_embeddings-$(DIM).npy $(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy
+	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) N_CLUSTERS=$(N_CLUSTERS) python colors.py $(DATA)
 
 $(DATA)/atlas.sqlite: $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).sqlite $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).pkl
 	sqlite3 $(DATA)/atlas.sqlite 'CREATE VIRTUAL TABLE nodes USING rtree(id INTEGER PRIMARY KEY, minX FLOAT NOT NULL, maxX FLOAT NOT NULL, minY FLOAT NOT NULL, maxY FLOAT NOT NULL);'
 	sqlite3 $(DATA)/atlas.sqlite 'ATTACH DATABASE "$(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).sqlite" AS graph; INSERT INTO nodes(id, minX, maxX, minY, maxY) SELECT rowid, x, x, y, y FROM graph.nodes;'
 
 clean:
-	rm -f $(DATA)/atlas.sqlite
-	rm -f $(DATA)/colors.sqlite
+	rm -f $(DATA)/*.arrow
+	rm -f $(DATA)/*.npy
 	rm -f $(DATA)/directory.sqlite
-	rm -f $(DATA)/graph-umap-*.sqlite
-	rm -f $(DATA)/graph-*.pkl

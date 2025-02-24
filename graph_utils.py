@@ -1,11 +1,64 @@
-import sqlite3
 import numpy as np
-from scipy.sparse import coo_matrix
+from numpy.typing import NDArray
+import pyarrow as pa
+import sqlite3
 
-edges_table='edges'
-nodes_table='nodes'
-source_col='source'
-target_col='target'
+edge_schema = pa.schema([
+    pa.field('weight', pa.float16()),
+    pa.field('source', pa.uint32()),
+    pa.field('target', pa.uint32()),
+])
+
+def write_edges(path: str, edges: tuple[NDArray[np.float16], NDArray[np.uint32], NDArray[np.uint32]]):
+    (weights, sources, targets) = edges
+
+    data = [
+        pa.array(weights, type=pa.float16()),
+        pa.array(sources, type=pa.uint32()),
+        pa.array(targets, type=pa.uint32()),
+    ]
+
+    with pa.OSFile(path, 'wb') as sink:
+        with pa.ipc.new_file(sink, schema=edge_schema) as writer:
+            batch = pa.record_batch(data, schema=edge_schema)
+            writer.write(batch)
+
+def read_edges(path: str, node_ids: NDArray[np.uint32]) -> tuple[NDArray[np.float16], NDArray[np.uint32], NDArray[np.uint32]]:
+    with pa.memory_map(path, 'r') as source:
+        data = pa.ipc.open_file(source).read_all()
+
+    weights: NDArray[np.float16] = data['weight'].to_numpy()
+    sources: NDArray[np.uint32] = data['source'].to_numpy()
+    targets: NDArray[np.uint32] = data['target'].to_numpy()
+
+    assert len(weights) == len(sources)
+    assert len(weights) == len(targets)
+
+    return (weights, sources, targets)
+
+node_schema = pa.schema([
+    pa.field('id', pa.uint32()),
+    pa.field('incoming_degree', pa.uint32()),
+])
+
+def write_nodes(path: str, ids: NDArray[np.uint32], incoming_degrees: NDArray[np.uint32]):
+    data = [
+        pa.array(ids, type=pa.uint32()),
+        pa.array(incoming_degrees, type=pa.uint32()),
+    ]
+
+    with pa.OSFile(path, 'wb') as sink:
+        with pa.ipc.new_file(sink, schema=node_schema) as writer:
+            batch = pa.record_batch(data, schema=node_schema)
+            writer.write(batch)
+
+def read_nodes(path: str) -> tuple[NDArray[np.uint32], NDArray[np.uint32]]:
+    with pa.memory_map(path, 'r') as source:
+        data = pa.ipc.open_file(source).read_all()
+
+    ids: NDArray[np.uint32] = data['id'].to_numpy()
+    incoming_degrees: NDArray[np.uint32] = data['incoming_degree'].to_numpy()
+    return (ids, incoming_degrees)
 
 def save_csr_graph(database_path, node_ids, csrgraph):
     coograph = csrgraph.tocoo()
@@ -58,41 +111,6 @@ def save_csr_graph(database_path, node_ids, csrgraph):
         raise e
     finally:
         conn.close()
-
-def load_coo_matrix(database_path):
-    conn = sqlite3.connect(database_path)
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute(f"SELECT rowid FROM {nodes_table} ORDER BY rowid")
-        node_ids = [row[0] for row in cursor.fetchall()]
-        node_count = len(node_ids)
-        print(f"Number of unique nodes: {node_count}")
-
-        id_to_index = {id: index for index, id in enumerate(node_ids)}
-
-        # Count edges
-        cursor.execute(f"SELECT COUNT(*) FROM {edges_table}")
-        edge_count = cursor.fetchone()[0]
-        print(f"Number of edges: {edge_count}")
-
-        # Allocate weights
-        data = np.ones(edge_count, dtype=np.float64)
-
-        rows = np.zeros(edge_count, dtype=np.int64)
-        cols = np.zeros(edge_count, dtype=np.int64)
-
-        # Fill indices array
-        cursor.execute(f"SELECT {source_col}, {target_col} FROM {edges_table} ORDER BY {source_col}")
-        for i, (source, target) in enumerate(cursor):
-            rows[i] = id_to_index[source]
-            cols[i] = id_to_index[target]
-
-    finally:
-        conn.close()
-
-    matrix = coo_matrix((data, (rows, cols)), shape=(node_count, node_count));
-    return (matrix, node_ids)
 
 def save_colors(database_path, node_ids, colors):
     print("opening", database_path)
