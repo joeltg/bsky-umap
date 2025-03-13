@@ -42,7 +42,7 @@ def main():
         print(f"Number of edges: {edge_count}")
 
         # Allocate weights
-        weights = np.ones(edge_count, dtype=np.float16)
+        weights = np.ones(edge_count, dtype=np.float32)
         rows = np.zeros(edge_count, dtype=np.uint32)
         cols = np.zeros(edge_count, dtype=np.uint32)
 
@@ -55,7 +55,7 @@ def main():
             cols[i] = t
             incoming_degrees[t] += 1
 
-            if i % 10000000 == 0:
+            if i > 0 and i % 10000000 == 0:
                 progress = 100 * float(i / edge_count)
                 print(f"loaded {i} edges out of {edge_count} ({progress:.2f}%)")
 

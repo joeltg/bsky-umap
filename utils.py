@@ -3,16 +3,16 @@ from numpy.typing import NDArray
 import pyarrow as pa
 
 edge_schema = pa.schema([
-    pa.field('weight', pa.float16()),
+    pa.field('weight', pa.float32()),
     pa.field('source', pa.uint32()),
     pa.field('target', pa.uint32()),
 ])
 
-def write_edges(path: str, edges: tuple[NDArray[np.float16], NDArray[np.uint32], NDArray[np.uint32]]):
+def write_edges(path: str, edges: tuple[NDArray[np.float32], NDArray[np.uint32], NDArray[np.uint32]]):
     (weights, sources, targets) = edges
 
     data = [
-        pa.array(weights, type=pa.float16()),
+        pa.array(weights, type=pa.float32()),
         pa.array(sources, type=pa.uint32()),
         pa.array(targets, type=pa.uint32()),
     ]
@@ -22,11 +22,11 @@ def write_edges(path: str, edges: tuple[NDArray[np.float16], NDArray[np.uint32],
             batch = pa.record_batch(data, schema=edge_schema)
             writer.write(batch)
 
-def read_edges(path: str, node_ids: NDArray[np.uint32]) -> tuple[NDArray[np.float16], NDArray[np.uint32], NDArray[np.uint32]]:
+def read_edges(path: str, node_ids: NDArray[np.uint32]) -> tuple[NDArray[np.float32], NDArray[np.uint32], NDArray[np.uint32]]:
     with pa.memory_map(path, 'r') as source:
         data = pa.ipc.open_file(source).read_all()
 
-    weights: NDArray[np.float16] = data['weight'].to_numpy()
+    weights: NDArray[np.float32] = data['weight'].to_numpy()
     sources: NDArray[np.uint32] = data['source'].to_numpy()
     targets: NDArray[np.uint32] = data['target'].to_numpy()
 

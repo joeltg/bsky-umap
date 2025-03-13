@@ -1,11 +1,9 @@
-scikit-learn==1.5.2
 nodevectors==0.1.23
-csrgraph==0.1.28
-scipy==1.10.1
-numpy==2.0.2
+scikit-learn
+csrgraph
+scipy
+numpy
+gensim==4.3.3
 python-dotenv==1.0.1
-hdbscan==0.8.39
-umap-learn==0.5.7
-matplotlib==3.9.2
 pyarrow==19.0.0
 hsluv==5.0.4
