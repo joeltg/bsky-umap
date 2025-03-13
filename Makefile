@@ -13,7 +13,7 @@ $(DATA)/graph.sqlite:
 	exit 1
 
 $(DATA)/directory.sqlite: $(DATA)/graph.sqlite
-	sqlite3 $(DATA)/directory.sqlite 'CREATE TABLE users(id INTEGER PRIMARY KEY NOT NULL, did TEXT NOT NULL);'
+	sqlite3 $(DATA)/directory.sqlite 'CREATE TABLE users(id INTEGER PRIMARY KEY NOT NULL, did TEXT);'
 	sqlite3 $(DATA)/directory.sqlite 'ATTACH DATABASE "$(DATA)/graph.sqlite" AS graph; INSERT INTO users(id, did) SELECT rowid, did FROM graph.nodes;'
 	sqlite3 $(DATA)/directory.sqlite 'CREATE INDEX user_did ON users(did);'
 
@@ -41,9 +41,9 @@ $(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_c
 $(DATA)/colors.buffer: $(DATA)/nodes.arrow $(DATA)/high_embeddings-$(DIM).npy $(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy
 	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) N_CLUSTERS=$(N_CLUSTERS) python colors.py $(DATA)
 
-$(DATA)/atlas.sqlite: $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).sqlite $(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).pkl
+$(DATA)/atlas.sqlite: $(DATA)/positions.sqlite
 	sqlite3 $(DATA)/atlas.sqlite 'CREATE VIRTUAL TABLE nodes USING rtree(id INTEGER PRIMARY KEY, minX FLOAT NOT NULL, maxX FLOAT NOT NULL, minY FLOAT NOT NULL, maxY FLOAT NOT NULL);'
-	sqlite3 $(DATA)/atlas.sqlite 'ATTACH DATABASE "$(DATA)/graph-umap-$(DIM)-$(N_NEIGHBORS).sqlite" AS graph; INSERT INTO nodes(id, minX, maxX, minY, maxY) SELECT rowid, x, x, y, y FROM graph.nodes;'
+	sqlite3 $(DATA)/atlas.sqlite 'ATTACH DATABASE "$(DATA)/positions.sqlite" AS graph; INSERT INTO nodes(id, minX, maxX, minY, maxY) SELECT rowid, x, x, y, y FROM graph.nodes;'
 
 clean:
 	rm -f $(DATA)/*.arrow
