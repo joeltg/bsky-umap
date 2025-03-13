@@ -21,7 +21,7 @@ def main():
     directory = arguments[0]
     database_path = os.path.join(directory, 'graph.sqlite')
 
-    conn = sqlite3.connect(database_path)
+    conn = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True)
     cursor = conn.cursor()
 
     try:
@@ -64,9 +64,11 @@ def main():
 
     nodes_path = os.path.join(directory, "nodes.arrow")
     write_nodes(nodes_path, ids, incoming_degrees)
+    print("wrote", nodes_path)
 
     edges_path = os.path.join(directory, "edges.arrow")
     write_edges(edges_path, (weights, rows, cols))
+    print("wrote", edges_path)
 
 if __name__ == "__main__":
     main()
