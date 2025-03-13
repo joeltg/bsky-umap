@@ -5,10 +5,11 @@ import cors from "cors";
 import { resolve } from "path";
 
 const app = express();
-const port = 3000;
 
 // Get folder path from command line argument, or use current directory
-const folderPath = resolve(process.argv[2] || ".");
+const folderPath = resolve(process.argv[2] ?? ".");
+
+const port = parseInt(process.argv[3] ?? "3000");
 
 // Enable CORS for all routes
 app.use(cors());
