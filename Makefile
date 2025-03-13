@@ -7,7 +7,7 @@ init: $(DATA)/directory.sqlite $(DATA)/edges.arrow $(DATA)/nodes.arrow
 embeddings: $(DATA)/high_embeddings-$(DIM).npy
 colors: $(DATA)/colors.buffer
 umap: $(DATA)/positions.sqlite
-save: $(DATA)/positions.buffer $(DATA)/atlas.sqlite
+save: $(DATA)/positions_x.buffer $(DATA)/positions_y.buffer $(DATA)/atlas.sqlite
 
 $(DATA)/graph.sqlite:
 	exit 1
@@ -29,7 +29,7 @@ $(DATA)/knn_indices-$(DIM)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(N_NEIGH
 $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy: $(DATA)/high_embeddings-$(DIM).npy $(DATA)/knn_indices-$(DIM)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(N_NEIGHBORS).npy
 	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python project.py $(DATA)
 
-$(DATA)/positions.buffer: $(DATA)/positions.sqlite $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy
+$(DATA)/positions_x.buffer $(DATA)/positions_y.buffer: $(DATA)/positions.sqlite $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy
 	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python anneal.py $(DATA)
 
 $(DATA)/positions.sqlite: $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy

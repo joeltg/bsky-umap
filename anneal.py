@@ -85,7 +85,9 @@ def main():
     # low_embeddings: NDArray[np.float32] = np.load(low_embeddings_path)
     # print("loaded low_embeddings", low_embeddings_path, low_embeddings.shape)
 
-    positions = np.zeros((len(ids), 2), dtype=np.float32)
+    # positions = np.zeros((len(ids), 2), dtype=np.float32)
+    positions_x = np.zeros(len(ids), dtype=np.float32)
+    positions_y = np.zeros(len(ids), dtype=np.float32)
 
     # engine = Engine(low_embeddings, node_mass)
     # print(engine)
@@ -105,13 +107,17 @@ def main():
         cursor = conn.cursor()
         cursor.execute("SELECT id, x, y FROM nodes ORDER BY id ASC")
         for i, (id, x, y) in enumerate(cursor):
-            positions[i][0] = x
-            positions[i][1] = y
+            # positions[i][0] = x
+            # positions[i][1] = y
+            positions_x[i] = x
+            positions_y[i] = y
     finally:
         conn.close()
 
-    positions_path = os.path.join(directory, "positions.buffer")
-    positions.tofile(positions_path)
+    x_path = os.path.join(directory, "positions_y.buffer")
+    y_path = os.path.join(directory, "positions_x.buffer")
+    positions_x.tofile(x_path)
+    positions_y.tofile(y_path)
 
 if __name__ == "__main__":
     main()
