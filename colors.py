@@ -10,7 +10,6 @@ from functools import partial
 from sklearn.neighbors import NearestNeighbors
 
 from utils import read_nodes
-from visualize_node_mass import visualize_node_mass
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -157,10 +156,6 @@ def main():
     cluster_centers_path = os.path.join(directory, f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy")
     cluster_centers: NDArray[np.float32] = np.load(cluster_centers_path)
     print("loaded cluster_centers", cluster_centers_path, cluster_centers.shape)
-
-    # visualize_node_mass(incoming_degrees)
-    # incoming_degrees_norm: NDArray[np.float32] = incoming_degrees.astype(np.float32) / np.max(incoming_degrees).astype(np.float32)
-    # node_mass: NDArray[np.float32] = 100 * np.sqrt(incoming_degrees_norm).astype(np.float32)
 
     log_degrees = np.log1p(incoming_degrees) / np.log(10)  # log10(1+x) to handle zeros gracefully
     # Normalize to [0,1] range
