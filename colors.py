@@ -10,6 +10,7 @@ from functools import partial
 from sklearn.neighbors import NearestNeighbors
 
 from utils import read_nodes
+from visualize_node_mass import visualize_node_mass
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -157,8 +158,17 @@ def main():
     cluster_centers: NDArray[np.float32] = np.load(cluster_centers_path)
     print("loaded cluster_centers", cluster_centers_path, cluster_centers.shape)
 
-    incoming_degrees_norm: NDArray[np.float32] = incoming_degrees.astype(np.float32) / np.max(incoming_degrees).astype(np.float32)
-    node_mass: NDArray[np.float32] = 100 * np.sqrt(incoming_degrees_norm).astype(np.float32)
+    # visualize_node_mass(incoming_degrees)
+    # incoming_degrees_norm: NDArray[np.float32] = incoming_degrees.astype(np.float32) / np.max(incoming_degrees).astype(np.float32)
+    # node_mass: NDArray[np.float32] = 100 * np.sqrt(incoming_degrees_norm).astype(np.float32)
+
+    log_degrees = np.log1p(incoming_degrees) / np.log(10)  # log10(1+x) to handle zeros gracefully
+    # Normalize to [0,1] range
+    log_degrees_norm = log_degrees / np.max(log_degrees)
+    # Scale to desired lightness range (e.g., 40-90)
+    min_lightness = 40
+    max_lightness = 90
+    node_mass: NDArray[np.float32] = min_lightness + (max_lightness - min_lightness) * log_degrees_norm
 
     n_cycles = 5
     n_neighbors = 3
@@ -199,6 +209,7 @@ def main():
             colors[start_idx:end_idx] = chunk_colors
 
     colors_path = os.path.join(directory, "colors.buffer")
+    print(f"Writing {colors_path}")
     colors.tofile(colors_path)
 
 if __name__ == "__main__":
