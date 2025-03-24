@@ -59,15 +59,9 @@ def get_lib_path():
 
     return (lib_path, lib_filename)
 
-
 (lib_path, lib_filename) = get_lib_path()
 
 _lib = CDLL(lib_path)
-# try:
-#     _lib = CDLL(lib_path)
-# except OSError:
-#     # Fallback to system paths if not found in current directory
-#     _lib = CDLL(lib_filename)
 
 # Set up the argument and return types for each function
 _lib.quadtree_init.argtypes = [c_float, c_float, c_float]
