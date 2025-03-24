@@ -1,0 +1,25 @@
+.{
+    .name = .quadtree_partitions,
+    .fingerprint = 0xd1b2eb7f2c3f940f,
+    .version = "0.0.0",
+    .minimum_zig_version = "0.14.0",
+    .paths = .{
+        "src",
+        "build.zig",
+        "build.zig.zon",
+    },
+    .dependencies = .{
+        .cli = .{
+            .url = "https://github.com/sam701/zig-cli/archive/7dcc9fa4dbfe77673c97a0be6b814f208373f54c.tar.gz",
+            .hash = "cli-0.9.0-2eKe_8D2AACsJeXkYpgqPjp7vhpWpGP5d5rdQ4Y1WBnP",
+        },
+        .rtree = .{
+            .url = "https://github.com/nDimensional/zig-rtree/archive/refs/tags/v0.2.0.tar.gz",
+            .hash = "rtree-0.2.0-O-39moyUAACwg6MbBfhOYZGV4yIbOMYABF9HCXECZyRV",
+        },
+        .sqlite = .{
+            .url = "https://github.com/nDimensional/zig-sqlite/archive/refs/tags/v0.2.1-3490100.tar.gz",
+            .hash = "sqlite-0.2.1-3490100-djiKTjV8AADEHLnzb_6K06fuioSVDUNJRlxX1hc_RzPl",
+        },
+    },
+}
