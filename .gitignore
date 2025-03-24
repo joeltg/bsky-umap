@@ -6,3 +6,6 @@ __pycache__
 .env
 .ropeproject
 keys/*.pem
+
+**/.zig-cache/
+**/zig-out/
