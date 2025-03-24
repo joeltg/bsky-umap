@@ -6,16 +6,24 @@ const sqlite = @import("sqlite");
 
 var config = struct {
     path: []const u8 = "",
+    capacity: u32 = 10000,
 }{};
 
 pub fn main() !void {
     var r = try cli.AppRunner.init(std.heap.page_allocator);
 
-    const arg = cli.PositionalArg{
+    const args: []const cli.PositionalArg = &.{.{
         .name = "path",
         .help = "path to data directory",
         .value_ref = r.mkRef(&config.path),
-    };
+    }};
+
+    const options: []const cli.Option = &.{.{
+        .long_name = "capacity",
+        .short_alias = 'c',
+        .help = "Maximumm capacity of each tile",
+        .value_ref = r.mkRef(&config.capacity),
+    }};
 
     const app = &cli.App{
         .command = .{
@@ -23,9 +31,10 @@ pub fn main() !void {
             .target = cli.CommandTarget{
                 .action = cli.CommandAction{
                     .exec = run,
-                    .positional_args = .{ .required = &.{arg} },
+                    .positional_args = .{ .required = args },
                 },
             },
+            .options = options,
         },
     };
 
@@ -91,13 +100,12 @@ const Tile = struct {
     area: quadtree.Area,
 };
 
-const capacity = 1000;
 fn addTile(tiles: *std.ArrayList(Tile), tree: *const quadtree.Quadtree, area: quadtree.Area, id: u32, level: u32) !void {
     const node = tree.tree.items[id];
     const count: u32 = @intFromFloat(@round(node.mass));
     try tiles.append(.{ .level = level, .count = count, .area = area });
 
-    if (count > capacity) {
+    if (count > config.capacity) {
         if (node.ne != quadtree.Node.NULL)
             try addTile(tiles, tree, area.divide(.ne), node.ne, level + 1);
         if (node.nw != quadtree.Node.NULL)
