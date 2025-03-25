@@ -2,13 +2,16 @@ const std = @import("std");
 
 const cli = @import("zig-cli");
 const quadtree = @import("quadtree");
+const sqlite = @import("sqlite");
 
+const Atlas = @import("Atlas.zig");
 const File = @import("File.zig");
 
 var config = struct {
     path: []const u8 = "",
     capacity: u32 = 80 * 4096, // max 2.6 MB positions, 1.3 MB colors
     write: bool = false,
+    atlas: bool = false,
 }{};
 
 pub fn main() !void {
@@ -33,6 +36,12 @@ pub fn main() !void {
             .help = "Write tiles to tiles/ folder",
             .value_ref = r.mkRef(&config.write),
         },
+        .{
+            .long_name = "atlas",
+            .short_alias = 'a',
+            .help = "Write atlas",
+            .value_ref = r.mkRef(&config.atlas),
+        },
     };
 
     const app = &cli.App{
@@ -54,9 +63,72 @@ pub fn main() !void {
 var path_buffer: [std.fs.max_path_bytes]u8 = undefined;
 
 fn run() !void {
+    std.log.info("config {any}", .{config});
     std.log.info("opening directory {s}", .{config.path});
     var dir = try std.fs.cwd().openDir(config.path, .{});
     defer dir.close();
+
+    if (config.atlas) {
+        const path = try dir.realpath("atlas.sqlite", &path_buffer);
+        path_buffer[path.len] = 0;
+
+        std.log.info("opening {s}", .{path_buffer[0..path.len :0]});
+        const db = try sqlite.Database.open(.{
+            .path = path_buffer[0..path.len :0],
+            .create = false,
+        });
+
+        defer db.close();
+
+        const area = select_area: {
+            const SelectAreaParams = struct {};
+            const SelectAreaResult = struct { min_x: f32, max_x: f32, min_y: f32, max_y: f32 };
+            const select_area = try db.prepare(SelectAreaParams, SelectAreaResult,
+                \\ SELECT
+                \\   MIN(minX) AS min_x,
+                \\   MAX(maxX) AS max_x,
+                \\   MIN(minY) AS min_y,
+                \\   MAX(maxY) AS max_y
+                \\ FROM nodes
+            );
+            defer select_area.finalize();
+
+            try select_area.bind(.{});
+            defer select_area.reset();
+            const result = try select_area.step() orelse return error.NoResults;
+
+            const s = 2 * @max(@abs(result.min_x), @abs(result.max_x), @abs(result.min_y), @abs(result.max_y));
+            break :select_area Atlas.Area{
+                .c = .{ 0, 0 },
+                .s = if (s > 0) std.math.pow(f32, 2, @ceil(std.math.log2(s))) else 0,
+            };
+        };
+
+        var atlas = Atlas.init(std.heap.c_allocator, area);
+        defer atlas.deinit();
+
+        var count: usize = 0;
+        { // Insert nodes into Quadtree
+            const SelectNodesParams = struct {};
+            const SelectNodesResult = struct { id: u32, x: f32, y: f32 };
+            const select_nodes = try db.prepare(SelectNodesParams, SelectNodesResult,
+                \\ SELECT id, minX AS x, minY AS y FROM nodes
+            );
+            defer select_nodes.finalize();
+
+            try select_nodes.bind(.{});
+            defer select_nodes.reset();
+            while (try select_nodes.step()) |result| : (count += 1) {
+                try atlas.insert(.{ .id = result.id, .position = .{ result.x, result.y } });
+            }
+        }
+
+        std.log.warn("body count: {d}", .{count});
+        std.log.warn("node count: {d}", .{atlas.tree.items.len});
+        std.log.warn("body size: {d}", .{count * @sizeOf(Atlas.Body)});
+        std.log.warn("node size: {d}", .{atlas.tree.items.len * @sizeOf(Atlas.Node)});
+        return;
+    }
 
     var walker = try TileWalker.init(std.heap.c_allocator, &dir);
     defer walker.deinit();
