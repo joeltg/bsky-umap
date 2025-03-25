@@ -289,6 +289,8 @@ const TileWalker = struct {
         const path = if (level == 0) "root" else self.tile_path.items;
         const filename = try std.fmt.bufPrint(&path_buffer, "tile-{d}-{s}-{s}", .{ level, path, name });
         try self.tile_dir.writeFile(.{ .sub_path = filename, .data = data });
+
+        try std.io.getStdOut().writer().print("wrote {s} ({d} KB)\n", .{ filename, data.len / 1000 });
         return .{ .filename = filename, .size = data.len };
     }
 };
