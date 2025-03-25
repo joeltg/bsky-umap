@@ -20,7 +20,7 @@ $(DATA)/directory.sqlite: $(DATA)/graph.sqlite
 $(DATA)/ids.buffer: $(DATA)/graph.sqlite
 	python sqlite_to_ids.py $(DATA)
 
-$(DATA)/edges.arrow $(DATA)/nodes.arrow $(DATA)/ids.buffer: $(DATA)/graph.sqlite
+$(DATA)/edges.arrow $(DATA)/nodes.arrow: $(DATA)/graph.sqlite
 	python sqlite_to_arrow.py $(DATA)
 
 $(DATA)/high_embeddings-$(DIM).npy: $(DATA)/nodes.arrow $(DATA)/edges.arrow
