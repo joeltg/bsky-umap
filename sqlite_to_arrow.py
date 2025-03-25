@@ -70,5 +70,9 @@ def main():
     write_edges(edges_path, (weights, rows, cols))
     print("wrote", edges_path)
 
+    ids_path = os.path.join(directory, "ids.buffer")
+    ids.tofile(ids_path)
+    print("wrote", ids_path)
+
 if __name__ == "__main__":
     main()

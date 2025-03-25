@@ -3,7 +3,7 @@ DIM         := 32
 N_NEIGHBORS := 25
 N_CLUSTERS  := 128
 
-init: $(DATA)/directory.sqlite $(DATA)/edges.arrow $(DATA)/nodes.arrow
+init: $(DATA)/directory.sqlite $(DATA)/edges.arrow $(DATA)/nodes.arrow $(DATA)/ids.buffer
 embeddings: $(DATA)/high_embeddings-$(DIM).npy
 colors: $(DATA)/colors.buffer
 umap: $(DATA)/positions.sqlite
@@ -17,7 +17,7 @@ $(DATA)/directory.sqlite: $(DATA)/graph.sqlite
 	sqlite3 $(DATA)/directory.sqlite 'ATTACH DATABASE "$(DATA)/graph.sqlite" AS graph; INSERT INTO users(id, did) SELECT rowid, did FROM graph.nodes;'
 	sqlite3 $(DATA)/directory.sqlite 'CREATE INDEX user_did ON users(did);'
 
-$(DATA)/edges.arrow $(DATA)/nodes.arrow: $(DATA)/graph.sqlite
+$(DATA)/edges.arrow $(DATA)/nodes.arrow $(DATA)/ids.buffer: $(DATA)/graph.sqlite
 	python sqlite_to_arrow.py $(DATA)
 
 $(DATA)/high_embeddings-$(DIM).npy: $(DATA)/nodes.arrow $(DATA)/edges.arrow
