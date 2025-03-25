@@ -125,10 +125,10 @@ fn run() !void {
 
         const stdout = std.io.getStdOut().writer();
 
-        try stdout.print("body count: {d}", .{count});
-        try stdout.print("node count: {d}", .{atlas.tree.items.len});
-        try stdout.print("body size: {d}", .{count * @sizeOf(Atlas.Body)});
-        try stdout.print("node size: {d}", .{atlas.tree.items.len * @sizeOf(Atlas.Node)});
+        try stdout.print("body count: {d}\n", .{count});
+        try stdout.print("node count: {d}\n", .{atlas.tree.items.len});
+        try stdout.print("body size: {d}\n", .{count * @sizeOf(Atlas.Body)});
+        try stdout.print("node size: {d}\n", .{atlas.tree.items.len * @sizeOf(Atlas.Node)});
         return;
     }
 
