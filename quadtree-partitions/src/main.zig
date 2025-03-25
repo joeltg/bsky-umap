@@ -9,8 +9,6 @@ const File = @import("File.zig");
 var config = struct {
     path: []const u8 = "",
     capacity: u32 = 80 * 4096, // max 2.6 MB positions, 1.3 MB colors
-    write: bool = false,
-    atlas: bool = false,
 }{};
 
 pub fn main() !void {
@@ -28,18 +26,6 @@ pub fn main() !void {
             .short_alias = 'c',
             .help = "Maximumm capacity of each tile",
             .value_ref = r.mkRef(&config.capacity),
-        },
-        .{
-            .long_name = "write",
-            .short_alias = 'w',
-            .help = "Write tiles to tiles/ folder",
-            .value_ref = r.mkRef(&config.write),
-        },
-        .{
-            .long_name = "atlas",
-            .short_alias = 'a',
-            .help = "Write atlas",
-            .value_ref = r.mkRef(&config.atlas),
         },
     };
 
