@@ -7,7 +7,7 @@ const File = @import("File.zig");
 
 var config = struct {
     path: []const u8 = "",
-    capacity: u32 = 10000,
+    capacity: u32 = 80 * 4096, // max 2.6 MB positions, 1.3 MB colors
     write: bool = false,
 }{};
 
