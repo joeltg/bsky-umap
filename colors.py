@@ -198,7 +198,6 @@ def main():
 
     # Process chunks in parallel
     with Pool(processes=n_threads) as pool:
-        total_chunks = len(chunks)
         for chunk_num, (start_idx, chunk_colors) in enumerate(pool.imap_unordered(process_chunk_partial, chunks)):
             end_idx = min(start_idx + len(chunk_colors), n_samples)
             colors[start_idx:end_idx] = chunk_colors
