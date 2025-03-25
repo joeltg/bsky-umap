@@ -4,8 +4,8 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const sqlite_dep = b.dependency("sqlite", .{ .SQLITE_ENABLE_RTREE = true });
-    const sqlite = sqlite_dep.module("sqlite");
+    // const sqlite_dep = b.dependency("sqlite", .{ .SQLITE_ENABLE_RTREE = true });
+    // const sqlite = sqlite_dep.module("sqlite");
 
     const rtree_dep = b.dependency("rtree", .{});
     const quadtree = rtree_dep.module("quadtree");
@@ -19,7 +19,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
-    cli.root_module.addImport("sqlite", sqlite);
+    // cli.root_module.addImport("sqlite", sqlite);
     cli.root_module.addImport("quadtree", quadtree);
     cli.root_module.addImport("zig-cli", cli_dep.module("zig-cli"));
 

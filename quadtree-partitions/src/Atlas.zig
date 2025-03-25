@@ -63,6 +63,20 @@ pub const Area = packed struct {
         const d = @abs(point - area.c) - s;
         return getNorm(2, @max(d, zero));
     }
+
+    pub fn toJSON(self: Area, stream: anytype) !void {
+        try stream.beginObject();
+        try stream.objectField("c");
+        try stream.beginObject();
+        try stream.objectField("x");
+        try stream.write(@as(i48, @intFromFloat(self.c[0])));
+        try stream.objectField("y");
+        try stream.write(@as(i48, @intFromFloat(self.c[1])));
+        try stream.endObject();
+        try stream.objectField("s");
+        try stream.write(@as(i48, @intFromFloat(self.s)));
+        try stream.endObject();
+    }
 };
 
 pub const Body = packed struct {

@@ -2,7 +2,6 @@ const std = @import("std");
 
 const cli = @import("zig-cli");
 const quadtree = @import("quadtree");
-const sqlite = @import("sqlite");
 
 const Atlas = @import("Atlas.zig");
 const File = @import("File.zig");
@@ -63,74 +62,9 @@ pub fn main() !void {
 var path_buffer: [std.fs.max_path_bytes]u8 = undefined;
 
 fn run() !void {
-    std.log.info("config {any}", .{config});
     std.log.info("opening directory {s}", .{config.path});
     var dir = try std.fs.cwd().openDir(config.path, .{});
     defer dir.close();
-
-    if (config.atlas) {
-        const path = try dir.realpath("atlas.sqlite", &path_buffer);
-        path_buffer[path.len] = 0;
-
-        std.log.info("opening {s}", .{path_buffer[0..path.len :0]});
-        const db = try sqlite.Database.open(.{
-            .path = path_buffer[0..path.len :0],
-            .create = false,
-        });
-
-        defer db.close();
-
-        const area = select_area: {
-            const SelectAreaParams = struct {};
-            const SelectAreaResult = struct { min_x: f32, max_x: f32, min_y: f32, max_y: f32 };
-            const select_area = try db.prepare(SelectAreaParams, SelectAreaResult,
-                \\ SELECT
-                \\   MIN(minX) AS min_x,
-                \\   MAX(maxX) AS max_x,
-                \\   MIN(minY) AS min_y,
-                \\   MAX(maxY) AS max_y
-                \\ FROM nodes
-            );
-            defer select_area.finalize();
-
-            try select_area.bind(.{});
-            defer select_area.reset();
-            const result = try select_area.step() orelse return error.NoResults;
-
-            const s = 2 * @max(@abs(result.min_x), @abs(result.max_x), @abs(result.min_y), @abs(result.max_y));
-            break :select_area Atlas.Area{
-                .c = .{ 0, 0 },
-                .s = if (s > 0) std.math.pow(f32, 2, @ceil(std.math.log2(s))) else 0,
-            };
-        };
-
-        var atlas = Atlas.init(std.heap.c_allocator, area);
-        defer atlas.deinit();
-
-        var count: usize = 0;
-        { // Insert nodes into Quadtree
-            const SelectNodesParams = struct {};
-            const SelectNodesResult = struct { id: u32, x: f32, y: f32 };
-            const select_nodes = try db.prepare(SelectNodesParams, SelectNodesResult,
-                \\ SELECT id, minX AS x, minY AS y FROM nodes
-            );
-            defer select_nodes.finalize();
-
-            try select_nodes.bind(.{});
-            defer select_nodes.reset();
-            while (try select_nodes.step()) |result| : (count += 1) {
-                try atlas.insert(.{ .id = result.id, .position = .{ result.x, result.y } });
-            }
-        }
-
-        const stdout = std.io.getStdOut().writer();
-
-        try stdout.print("body count: {d}\n", .{count});
-        try stdout.print("node count: {d}\n", .{atlas.tree.items.len});
-        try stdout.print("body size: {d}\n", .{count * @sizeOf(Atlas.Body)});
-        try stdout.print("node size: {d}\n", .{atlas.tree.items.len * @sizeOf(Atlas.Node)});
-        return;
-    }
 
     var walker = try TileWalker.init(std.heap.c_allocator, &dir);
     defer walker.deinit();
@@ -138,11 +72,7 @@ fn run() !void {
     try walker.build();
 }
 
-const Tile = struct {
-    level: u32,
-    count: u32,
-    area: quadtree.Area,
-};
+const JsonStream = std.json.WriteStream(std.fs.File.Writer, .{ .checked_to_fixed_depth = 256 });
 
 const TileWalker = struct {
     allocator: std.mem.Allocator,
@@ -154,7 +84,6 @@ const TileWalker = struct {
     atlas: Atlas,
     tile_dir: std.fs.Dir,
     tile_path: std.ArrayList(u8),
-    tiles: std.ArrayList(Tile),
     tree: quadtree.Quadtree,
 
     tile_positions: std.ArrayList(u8),
@@ -220,7 +149,6 @@ const TileWalker = struct {
             .atlas = Atlas.init(allocator, .{}),
             .tile_dir = tile_dir,
             .tile_path = std.ArrayList(u8).init(allocator),
-            .tiles = std.ArrayList(Tile).init(allocator),
             .tree = quadtree.Quadtree.init(std.heap.c_allocator, area, .{}),
             .tile_positions = std.ArrayList(u8).init(allocator),
             .tile_colors = std.ArrayList(u8).init(allocator),
@@ -235,7 +163,6 @@ const TileWalker = struct {
         self.colors.deinit();
         self.ids.deinit();
         self.tree.deinit();
-        self.tiles.deinit();
         self.tile_path.deinit();
         self.tile_positions.deinit();
         self.tile_colors.deinit();
@@ -252,93 +179,130 @@ const TileWalker = struct {
 
         std.log.info("inserted {d} points into quadtree", .{self.node_count});
 
-        try self.addTile(self.tree.area, 0);
-        std.log.info("TILES", .{});
-        var sum: u32 = 0;
-        for (self.tiles.items) |tile| {
-            std.log.info(
-                "- level {d}, count {d}, area [ c = ({d}, {d}), s = {d} ]",
-                .{ tile.level, tile.count, tile.area.c[0], tile.area.c[1], tile.area.s },
-            );
-            sum += @min(tile.count, config.capacity);
-        }
+        const index_file = try self.tile_dir.createFile("index.json", .{});
+        defer index_file.close();
 
-        std.log.info("got {d} tiles ({d} total count)", .{ self.tiles.items.len, sum });
+        var stream = std.json.writeStream(index_file.writer(), .{ .whitespace = .indent_tab });
+        defer stream.deinit();
+
+        const area = self.tree.area;
+        try self.addTile(.{ .c = area.c, .s = area.s }, 0, &stream);
     }
 
     inline fn shuffle(self: *TileWalker) void {
         self.rng.random().shuffle(u32, self.node_indices);
     }
 
-    fn addTile(self: *TileWalker, area: quadtree.Area, idx: u32) !void {
+    fn addTile(self: *TileWalker, area: Atlas.Area, idx: u32, stream: *JsonStream) !void {
         const node = self.tree.tree.items[idx];
-        const count: u32 = @intFromFloat(@round(node.mass));
-        try self.tiles.append(.{ .level = @intCast(self.tile_path.items.len), .count = count, .area = area });
+        const total: u32 = @intFromFloat(@round(node.mass));
 
-        if (config.write) {
-            self.tile_positions.clearRetainingCapacity();
-            self.tile_colors.clearRetainingCapacity();
-            self.shuffle();
+        self.atlas.reset(area);
+        self.tile_positions.clearRetainingCapacity();
+        self.tile_colors.clearRetainingCapacity();
+        self.shuffle();
 
-            self.atlas.reset(.{ .c = area.c, .s = area.s });
-            for (self.node_indices) |i| {
-                const id = std.mem.readInt(u32, @ptrCast(self.ids.data[i * 4 .. i * 4 + 4]), .little);
-                const x: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(self.positions.data[i * 8 .. i * 8 + 4]), .little));
-                const y: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(self.positions.data[i * 8 + 4 .. i * 8 + 8]), .little));
-                const position = @Vector(2, f32){ x, y };
-                if (area.contains(position)) {
-                    try self.tile_colors.appendSlice(self.colors.data[i * 4 .. i * 4 + 4]);
-                    try self.tile_positions.appendSlice(self.positions.data[i * 8 .. i * 8 + 8]);
-                    try self.atlas.insert(.{ .id = id, .position = position });
-                    if (self.tile_colors.items.len >= config.capacity) {
-                        break;
-                    }
+        var count: u32 = 0;
+        for (self.node_indices) |i| {
+            const id = std.mem.readInt(u32, @ptrCast(self.ids.data[i * 4 .. i * 4 + 4]), .little);
+            const x: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(self.positions.data[i * 8 .. i * 8 + 4]), .little));
+            const y: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(self.positions.data[i * 8 + 4 .. i * 8 + 8]), .little));
+            const position = @Vector(2, f32){ x, y };
+            if (area.contains(position)) {
+                try self.tile_colors.appendSlice(self.colors.data[i * 4 .. i * 4 + 4]);
+                try self.tile_positions.appendSlice(self.positions.data[i * 8 .. i * 8 + 8]);
+                try self.atlas.insert(.{ .id = id, .position = position });
+                count += 1;
+                if (count >= config.capacity) {
+                    break;
                 }
-            }
-
-            try self.writeFile("positions.buffer", self.tile_positions.items);
-            try self.writeFile("colors.buffer", self.tile_colors.items);
-            if (count <= config.capacity) {
-                const len = self.atlas.tree.items.len * @sizeOf(Atlas.Node);
-                const ptr: [*]const u8 = @ptrCast(self.atlas.tree.items.ptr);
-                try self.writeFile("quadtree.atlas", ptr[0..len]);
             }
         }
 
-        if (count > config.capacity) {
+        try stream.beginObject();
+
+        try stream.objectField("level");
+        try stream.write(self.tile_path.items.len);
+        try stream.objectField("total");
+        try stream.write(total);
+        try stream.objectField("count");
+        try stream.write(count);
+
+        try stream.objectField("area");
+        try area.toJSON(stream);
+
+        { // write positions
+            try stream.objectField("positions");
+            const result = try self.writeFile("positions", self.tile_positions.items);
+            try result.write(stream);
+        }
+
+        { // write colors
+            try stream.objectField("colors");
+            const result = try self.writeFile("colors", self.tile_colors.items);
+            try result.write(stream);
+        }
+
+        if (total > config.capacity) {
             if (node.ne != quadtree.Node.NULL) {
+                try stream.objectField("ne");
                 try self.tile_path.append('0');
-                try self.addTile(area.divide(.ne), node.ne);
+                try self.addTile(area.divide(.ne), node.ne, stream);
                 std.debug.assert(self.tile_path.pop() == '0');
             }
 
             if (node.nw != quadtree.Node.NULL) {
+                try stream.objectField("nw");
                 try self.tile_path.append('1');
-                try self.addTile(area.divide(.nw), node.nw);
+                try self.addTile(area.divide(.nw), node.nw, stream);
                 std.debug.assert(self.tile_path.pop() == '1');
             }
 
             if (node.sw != quadtree.Node.NULL) {
+                try stream.objectField("sw");
                 try self.tile_path.append('2');
-                try self.addTile(area.divide(.sw), node.sw);
+                try self.addTile(area.divide(.sw), node.sw, stream);
                 std.debug.assert(self.tile_path.pop() == '2');
             }
 
             if (node.se != quadtree.Node.NULL) {
+                try stream.objectField("se");
                 try self.tile_path.append('3');
-                try self.addTile(area.divide(.se), node.se);
+                try self.addTile(area.divide(.se), node.se, stream);
                 std.debug.assert(self.tile_path.pop() == '3');
             }
+        } else {
+            const len = self.atlas.tree.items.len * @sizeOf(Atlas.Node);
+            const ptr: [*]const u8 = @ptrCast(self.atlas.tree.items.ptr);
+            { // write atlas
+                try stream.objectField("atlas");
+                const result = try self.writeFile("atlas", ptr[0..len]);
+                try result.write(stream);
+            }
         }
+
+        try stream.endObject();
     }
 
-    fn writeFile(self: *TileWalker, name: []const u8, data: []const u8) !void {
+    const WriteFileResult = struct {
+        filename: []const u8,
+        size: usize,
+
+        pub fn write(self: WriteFileResult, stream: *JsonStream) !void {
+            try stream.beginObject();
+            try stream.objectField("filename");
+            try stream.write(self.filename);
+            try stream.objectField("size");
+            try stream.write(self.size);
+            try stream.endObject();
+        }
+    };
+
+    fn writeFile(self: *TileWalker, name: []const u8, data: []const u8) !WriteFileResult {
         const level = self.tile_path.items.len;
         const path = if (level == 0) "root" else self.tile_path.items;
         const filename = try std.fmt.bufPrint(&path_buffer, "tile-{d}-{s}-{s}", .{ level, path, name });
         try self.tile_dir.writeFile(.{ .sub_path = filename, .data = data });
-
-        const stdout = std.io.getStdOut();
-        try stdout.writer().print("wrote {s} ({d} KB)\n", .{ filename, data.len / 1000 });
+        return .{ .filename = filename, .size = data.len };
     }
 };
