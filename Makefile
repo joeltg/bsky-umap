@@ -17,10 +17,10 @@ $(DATA)/directory.sqlite: $(DATA)/graph.sqlite
 	sqlite3 $(DATA)/directory.sqlite 'ATTACH DATABASE "$(DATA)/graph.sqlite" AS graph; INSERT INTO users(id, did) SELECT rowid, did FROM graph.nodes;'
 	sqlite3 $(DATA)/directory.sqlite 'CREATE INDEX user_did ON users(did);'
 
-$(DATA)/ids.buffer: $(DATA)/graph.sqlite
-	python sqlite_to_ids.py $(DATA)
+# $(DATA)/ids.buffer: $(DATA)/graph.sqlite
+# 	python sqlite_to_ids.py $(DATA)
 
-$(DATA)/edges.arrow $(DATA)/nodes.arrow: $(DATA)/graph.sqlite
+$(DATA)/edges.arrow $(DATA)/nodes.arrow $(DATA)/ids.buffer: $(DATA)/graph.sqlite
 	python sqlite_to_arrow.py $(DATA)
 
 $(DATA)/high_embeddings-$(DIM).npy: $(DATA)/nodes.arrow $(DATA)/edges.arrow
