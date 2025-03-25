@@ -77,7 +77,7 @@ pub const Body = packed struct {
 /// and use Node.NULL for empty slots.
 ///
 /// Leaf nodes have { id, x, y, 0 }.
-/// The last slot node.se = 0 distinguishes leafs from nodes,
+/// The last slot node.se = 0 distinguishes leaves from nodes,
 /// since nodes can never link to index zero.
 pub const Node = packed struct {
     pub const NULL = std.math.maxInt(u32);
@@ -172,12 +172,12 @@ pub fn insert(self: *Atlas, body: Body) !void {
     }
 }
 
-fn insertNode(self: *Atlas, id: u32, area: Area, body: Body) !void {
-    std.debug.assert(id < self.tree.items.len);
+fn insertNode(self: *Atlas, idx: u32, area: Area, body: Body) !void {
+    std.debug.assert(idx < self.tree.items.len);
     std.debug.assert(area.s > 0);
 
-    if (self.tree.items[id].isLeaf()) {
-        const node = self.tree.items[id];
+    if (self.tree.items[idx].isLeaf()) {
+        const node = self.tree.items[idx];
         const node_position = node.getPosition();
         const node_quadrant = area.locate(node_position);
 
@@ -187,19 +187,19 @@ fn insertNode(self: *Atlas, id: u32, area: Area, body: Body) !void {
         const index: u32 = @intCast(self.tree.items.len);
         try self.tree.append(node);
 
-        self.tree.items[id].clear();
-        self.tree.items[id].setQuadrant(node_quadrant, index);
+        self.tree.items[idx].clear();
+        self.tree.items[idx].setQuadrant(node_quadrant, index);
     }
 
     const body_quadrant = area.locate(body.position);
-    const child = self.tree.items[id].getQuadrant(body_quadrant);
+    const child = self.tree.items[idx].getQuadrant(body_quadrant);
 
     if (child != Node.NULL) {
         try self.insertNode(child, area.divide(body_quadrant), body);
     } else {
         const index: u32 = @intCast(self.tree.items.len);
         try self.tree.append(Node.create(body));
-        self.tree.items[id].setQuadrant(body_quadrant, index);
+        self.tree.items[idx].setQuadrant(body_quadrant, index);
     }
 }
 
@@ -217,17 +217,17 @@ pub fn getNearestBody(self: Atlas, position: @Vector(2, f32), mode: NearestBodyM
 
 fn getNearestBodyNode(
     self: Atlas,
-    id: u32,
+    idx: u32,
     area: Area,
     position: @Vector(2, f32),
     mode: NearestBodyMode,
     nearest: *Body,
     nearest_dist: *f32,
 ) void {
-    if (id >= self.tree.items.len)
+    if (idx >= self.tree.items.len)
         @panic("index out of range");
 
-    const node = self.tree.items[id];
+    const node = self.tree.items[idx];
 
     if (node.isLeaf()) {
         const node_position = node.getPosition();
@@ -256,17 +256,17 @@ pub fn print(self: *Atlas, log: std.fs.File.Writer) !void {
     try self.printNode(log, 0, 1);
 }
 
-fn printNode(self: *Atlas, log: std.fs.File.Writer, id: u32, depth: usize) !void {
-    if (id >= self.tree.items.len)
+fn printNode(self: *Atlas, log: std.fs.File.Writer, idx: u32, depth: usize) !void {
+    if (idx >= self.tree.items.len)
         @panic("index out of range");
 
-    const node = self.tree.items[id];
+    const node = self.tree.items[idx];
     if (node.isLeaf()) {
-        try log.print("leaf {d} - {d}\n", .{ id, node.getId() });
+        try log.print("leaf {d} - {d}\n", .{ idx, node.getId() });
         return;
     }
 
-    try log.print("node {d}\n", .{id});
+    try log.print("node {d}\n", .{idx});
     if (node.sw != Node.NULL) {
         try log.writeByteNTimes(' ', depth * 2);
         try log.print("sw: ", .{});
@@ -320,6 +320,8 @@ test "create and construct Atlas" {
 
     const stdout = std.io.getStdOut();
     try atlas.print(stdout.writer());
+
+    try stdout.writer().print("@sizeOf(Node): {d}\n", .{@sizeOf(Node)});
 
     // std.log.warn("internal nodes: {d}", .{atlas.tree.items.len});
     // std.log.warn("total size: {d}", .{atlas.tree.items.len * @sizeOf(Node)});

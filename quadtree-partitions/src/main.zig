@@ -148,8 +148,10 @@ const TileWalker = struct {
     allocator: std.mem.Allocator,
     positions: File,
     colors: File,
+    ids: File,
     node_count: usize,
     node_indices: []u32,
+    atlas: Atlas,
     tile_dir: std.fs.Dir,
     tile_path: std.ArrayList(u8),
     tiles: std.ArrayList(Tile),
@@ -170,6 +172,10 @@ const TileWalker = struct {
         const colors_path = try dir.realpath("colors.buffer", &path_buffer);
         const colors = try File.init(colors_path);
         errdefer colors.deinit();
+
+        const ids_path = try dir.realpath("ids.buffer", &path_buffer);
+        const ids = try File.init(ids_path);
+        errdefer ids.deinit();
 
         std.log.info("positions.len: {d}", .{positions.data.len});
         std.log.info("colors.len: {d}", .{colors.data.len});
@@ -208,8 +214,10 @@ const TileWalker = struct {
             .allocator = allocator,
             .positions = positions,
             .colors = colors,
+            .ids = ids,
             .node_count = node_count,
             .node_indices = node_indices,
+            .atlas = Atlas.init(allocator, .{}),
             .tile_dir = tile_dir,
             .tile_path = std.ArrayList(u8).init(allocator),
             .tiles = std.ArrayList(Tile).init(allocator),
@@ -222,8 +230,10 @@ const TileWalker = struct {
 
     pub fn deinit(self: *TileWalker) void {
         self.allocator.free(self.node_indices);
+        self.atlas.deinit();
         self.positions.deinit();
         self.colors.deinit();
+        self.ids.deinit();
         self.tree.deinit();
         self.tiles.deinit();
         self.tile_path.deinit();
@@ -260,8 +270,8 @@ const TileWalker = struct {
         self.rng.random().shuffle(u32, self.node_indices);
     }
 
-    fn addTile(self: *TileWalker, area: quadtree.Area, id: u32) !void {
-        const node = self.tree.tree.items[id];
+    fn addTile(self: *TileWalker, area: quadtree.Area, idx: u32) !void {
+        const node = self.tree.tree.items[idx];
         const count: u32 = @intFromFloat(@round(node.mass));
         try self.tiles.append(.{ .level = @intCast(self.tile_path.items.len), .count = count, .area = area });
 
@@ -270,13 +280,16 @@ const TileWalker = struct {
             self.tile_colors.clearRetainingCapacity();
             self.shuffle();
 
+            self.atlas.reset(.{ .c = area.c, .s = area.s });
             for (self.node_indices) |i| {
+                const id = std.mem.readInt(u32, @ptrCast(self.ids.data[i * 4 .. i * 4 + 4]), .little);
                 const x: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(self.positions.data[i * 8 .. i * 8 + 4]), .little));
                 const y: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(self.positions.data[i * 8 + 4 .. i * 8 + 8]), .little));
-                if (area.contains(.{ x, y })) {
+                const position = @Vector(2, f32){ x, y };
+                if (area.contains(position)) {
                     try self.tile_colors.appendSlice(self.colors.data[i * 4 .. i * 4 + 4]);
                     try self.tile_positions.appendSlice(self.positions.data[i * 8 .. i * 8 + 8]);
-
+                    try self.atlas.insert(.{ .id = id, .position = position });
                     if (self.tile_colors.items.len >= config.capacity) {
                         break;
                     }
@@ -285,6 +298,11 @@ const TileWalker = struct {
 
             try self.writeFile("positions.buffer", self.tile_positions.items);
             try self.writeFile("colors.buffer", self.tile_colors.items);
+            if (count <= config.capacity) {
+                const len = self.atlas.tree.items.len * @sizeOf(Atlas.Node);
+                const ptr: [*]const u8 = @ptrCast(self.atlas.tree.items.ptr);
+                try self.writeFile("quadtree.atlas", ptr[0..len]);
+            }
         }
 
         if (count > config.capacity) {
