@@ -123,10 +123,12 @@ fn run() !void {
             }
         }
 
-        std.log.warn("body count: {d}", .{count});
-        std.log.warn("node count: {d}", .{atlas.tree.items.len});
-        std.log.warn("body size: {d}", .{count * @sizeOf(Atlas.Body)});
-        std.log.warn("node size: {d}", .{atlas.tree.items.len * @sizeOf(Atlas.Node)});
+        const stdout = std.io.getStdOut().writer();
+
+        stdout.print("body count: {d}", .{count});
+        stdout.print("node count: {d}", .{atlas.tree.items.len});
+        stdout.print("body size: {d}", .{count * @sizeOf(Atlas.Body)});
+        stdout.print("node size: {d}", .{atlas.tree.items.len * @sizeOf(Atlas.Node)});
         return;
     }
 
