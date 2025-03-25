@@ -70,66 +70,73 @@ pub const Body = packed struct {
     position: @Vector(2, f32) = .{ 0, 0 },
 };
 
+/// We can pack both nodes and leaves into 16 bytes total,
+/// while still distinguishing between them.
+///
+/// Intermediate nodes hold up to four links,
+/// and use Node.NULL for empty slots.
+///
+/// Leaf nodes have { id, x, y, 0 }.
+/// The last slot node.se = 0 distinguishes leafs from nodes,
+/// since nodes can never link to index zero.
 pub const Node = packed struct {
     pub const NULL = std.math.maxInt(u32);
 
-    id: u32 = NULL,
     ne: u32 = NULL,
     nw: u32 = NULL,
     sw: u32 = NULL,
     se: u32 = NULL,
 
     pub fn create(body: Body) Node {
-        var node = Node{ .id = body.id };
-        node.setPosition(body.position);
+        var node = Node{};
+        node.setLeaf(body);
         return node;
     }
 
-    pub inline fn clear(self: *Node) void {
-        self.id = NULL;
-        self.sw = NULL;
-        self.nw = NULL;
-        self.se = NULL;
-        self.ne = NULL;
+    pub inline fn isLeaf(node: Node) bool {
+        return node.se == 0;
     }
 
-    pub inline fn isEmpty(node: Node) bool {
-        return node.sw == NULL and node.nw == NULL and node.se == NULL and node.ne == NULL;
+    pub inline fn clear(self: *Node) void {
+        self.ne = NULL;
+        self.nw = NULL;
+        self.sw = NULL;
+        self.se = NULL;
+    }
+
+    pub inline fn setLeaf(self: *Node, body: Body) void {
+        self.ne = body.id;
+        self.nw = @bitCast(body.position[0]);
+        self.sw = @bitCast(body.position[1]);
+        self.se = 0;
+    }
+
+    pub inline fn getId(self: Node) u32 {
+        std.debug.assert(self.se == 0);
+        return self.ne;
     }
 
     pub inline fn getPosition(self: Node) @Vector(2, f32) {
-        return .{ @bitCast(self.ne), @bitCast(self.nw) };
-    }
-
-    pub inline fn setPosition(self: *Node, position: @Vector(2, f32)) void {
-        self.ne = @bitCast(position[0]);
-        self.nw = @bitCast(position[1]);
+        std.debug.assert(self.se == 0);
+        return .{ @bitCast(self.nw), @bitCast(self.sw) };
     }
 
     pub inline fn getQuadrant(node: Node, quadrant: Quadrant) u32 {
         return switch (quadrant) {
-            .sw => node.sw,
-            .nw => node.nw,
-            .se => node.se,
             .ne => node.ne,
+            .nw => node.nw,
+            .sw => node.sw,
+            .se => node.se,
         };
     }
 
     pub inline fn setQuadrant(node: *Node, quadrant: Quadrant, index: u32) void {
         switch (quadrant) {
-            .sw => node.sw = index,
-            .nw => node.nw = index,
-            .se => node.se = index,
             .ne => node.ne = index,
+            .nw => node.nw = index,
+            .sw => node.sw = index,
+            .se => node.se = index,
         }
-    }
-
-    pub inline fn add(node: *Node) void {
-        node.id_or_count += 1;
-    }
-
-    pub inline fn remove(node: *Node) void {
-        node.id_or_count -= 1;
     }
 };
 
@@ -169,7 +176,7 @@ fn insertNode(self: *Atlas, id: u32, area: Area, body: Body) !void {
     std.debug.assert(id < self.tree.items.len);
     std.debug.assert(area.s > 0);
 
-    if (self.tree.items[id].id != Node.NULL) {
+    if (self.tree.items[id].isLeaf()) {
         const node = self.tree.items[id];
         const node_position = node.getPosition();
         const node_quadrant = area.locate(node_position);
@@ -196,13 +203,13 @@ fn insertNode(self: *Atlas, id: u32, area: Area, body: Body) !void {
     }
 }
 
-pub const NearestBodyMode = enum { inclusive, exclusive };
+pub const NearestBodyMode = enum(u2) { inclusive, exclusive };
 
 pub fn getNearestBody(self: Atlas, position: @Vector(2, f32), mode: NearestBodyMode) !Body {
     if (self.tree.items.len == 0)
         return error.Empty;
 
-    var nearest = Body{ .id = Node.NULL };
+    var nearest = Body{};
     var neartest_dist = std.math.inf(f32);
     self.getNearestBodyNode(0, self.area, position, mode, &nearest, &neartest_dist);
     return nearest;
@@ -222,14 +229,14 @@ fn getNearestBodyNode(
 
     const node = self.tree.items[id];
 
-    if (node.id != Node.NULL) {
+    if (node.isLeaf()) {
         const node_position = node.getPosition();
         if (@reduce(.And, node_position == position) and mode == .exclusive)
             return;
 
         const dist = getNorm(2, node_position - position);
         if (dist < nearest_dist.*) {
-            nearest.id = node.id;
+            nearest.id = node.getId();
             nearest.position = node_position;
             nearest_dist.* = dist;
         }
@@ -254,8 +261,8 @@ fn printNode(self: *Atlas, log: std.fs.File.Writer, id: u32, depth: usize) !void
         @panic("index out of range");
 
     const node = self.tree.items[id];
-    if (node.id != Node.NULL) {
-        try log.print("leaf {d} - {d}\n", .{ id, node.id });
+    if (node.isLeaf()) {
+        try log.print("leaf {d} - {d}\n", .{ id, node.getId() });
         return;
     }
 
