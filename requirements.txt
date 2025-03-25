@@ -7,3 +7,4 @@ gensim==4.3.3
 python-dotenv==1.0.1
 pyarrow==19.0.0
 hsluv==5.0.4
+gensim==4.3.3
