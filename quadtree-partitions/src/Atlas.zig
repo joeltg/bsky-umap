@@ -63,20 +63,6 @@ pub const Area = packed struct {
         const d = @abs(point - area.c) - s;
         return getNorm(2, @max(d, zero));
     }
-
-    pub fn toJSON(self: Area, stream: anytype) !void {
-        try stream.beginObject();
-        try stream.objectField("c");
-        try stream.beginObject();
-        try stream.objectField("x");
-        try stream.write(@as(i48, @intFromFloat(self.c[0])));
-        try stream.objectField("y");
-        try stream.write(@as(i48, @intFromFloat(self.c[1])));
-        try stream.endObject();
-        try stream.objectField("s");
-        try stream.write(@as(i48, @intFromFloat(self.s)));
-        try stream.endObject();
-    }
 };
 
 pub const Body = packed struct {
@@ -219,30 +205,26 @@ fn insertNode(self: *Atlas, idx: u32, area: Area, body: Body) !void {
 
 pub const NearestBodyMode = enum(u2) { inclusive, exclusive };
 
-pub fn getNearestBody(self: Atlas, position: @Vector(2, f32), mode: NearestBodyMode) !Body {
-    if (self.tree.items.len == 0)
+pub fn getNearestBody(nodes: []const Node, area: Area, position: @Vector(2, f32), mode: NearestBodyMode) !Body {
+    if (nodes.len == 0)
         return error.Empty;
 
     var nearest = Body{};
     var neartest_dist = std.math.inf(f32);
-    self.getNearestBodyNode(0, self.area, position, mode, &nearest, &neartest_dist);
+    getNearestBodyNode(nodes, area, 0, position, mode, &nearest, &neartest_dist);
     return nearest;
 }
 
 fn getNearestBodyNode(
-    self: Atlas,
-    idx: u32,
+    nodes: []const Node,
     area: Area,
+    idx: u32,
     position: @Vector(2, f32),
     mode: NearestBodyMode,
     nearest: *Body,
     nearest_dist: *f32,
 ) void {
-    if (idx >= self.tree.items.len)
-        @panic("index out of range");
-
-    const node = self.tree.items[idx];
-
+    const node = nodes[idx];
     if (node.isLeaf()) {
         const node_position = node.getPosition();
         if (@reduce(.And, node_position == position) and mode == .exclusive)
@@ -256,13 +238,13 @@ fn getNearestBodyNode(
         }
     } else if (area.getMinDistance(position) < nearest_dist.*) {
         if (node.sw != Node.NULL)
-            self.getNearestBodyNode(node.sw, area.divide(.sw), position, mode, nearest, nearest_dist);
+            getNearestBodyNode(nodes, area.divide(.sw), node.sw, position, mode, nearest, nearest_dist);
         if (node.nw != Node.NULL)
-            self.getNearestBodyNode(node.nw, area.divide(.nw), position, mode, nearest, nearest_dist);
+            getNearestBodyNode(nodes, area.divide(.nw), node.nw, position, mode, nearest, nearest_dist);
         if (node.se != Node.NULL)
-            self.getNearestBodyNode(node.se, area.divide(.se), position, mode, nearest, nearest_dist);
+            getNearestBodyNode(nodes, area.divide(.se), node.se, position, mode, nearest, nearest_dist);
         if (node.ne != Node.NULL)
-            self.getNearestBodyNode(node.ne, area.divide(.ne), position, mode, nearest, nearest_dist);
+            getNearestBodyNode(nodes, area.divide(.ne), node.ne, position, mode, nearest, nearest_dist);
     }
 }
 
@@ -271,9 +253,6 @@ pub fn print(self: *Atlas, log: std.fs.File.Writer) !void {
 }
 
 fn printNode(self: *Atlas, log: std.fs.File.Writer, idx: u32, depth: usize) !void {
-    if (idx >= self.tree.items.len)
-        @panic("index out of range");
-
     const node = self.tree.items[idx];
     if (node.isLeaf()) {
         try log.print("leaf {d} - {d}\n", .{ idx, node.getId() });

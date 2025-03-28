@@ -11,22 +11,45 @@ pub fn build(b: *std.Build) void {
     const quadtree = rtree_dep.module("quadtree");
 
     const cli_dep = b.dependency("cli", .{});
+    const cli = cli_dep.module("zig-cli");
 
-    const cli = b.addExecutable(.{
-        .name = "quadtree-partitions",
-        .root_source_file = b.path("./src/main.zig"),
-        .optimize = optimize,
-        .target = target,
+    const atlas = b.addModule("atlas", .{
+        .root_source_file = b.path("./src/Atlas.zig"),
     });
 
-    // cli.root_module.addImport("sqlite", sqlite);
-    cli.root_module.addImport("quadtree", quadtree);
-    cli.root_module.addImport("zig-cli", cli_dep.module("zig-cli"));
+    {
+        const lib = b.addExecutable(.{
+            .name = "wasmtest",
+            .root_source_file = b.path("./lib/lib.zig"),
+            .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
+            .optimize = optimize,
+            .version = .{ .major = 0, .minor = 0, .patch = 1 },
+        });
 
-    cli.linkLibC();
-    b.installArtifact(cli);
+        lib.root_module.addImport("atlas", atlas);
 
-    const run_artifact = b.addRunArtifact(cli);
-    const run_step = b.step("run", "Run the application");
-    run_step.dependOn(&run_artifact.step);
+        lib.entry = .disabled;
+        lib.rdynamic = true;
+        b.installArtifact(lib);
+    }
+
+    {
+        const exe = b.addExecutable(.{
+            .name = "quadtree-partitions",
+            .root_source_file = b.path("./src/main.zig"),
+            .optimize = optimize,
+            .target = target,
+        });
+
+        // cli.root_module.addImport("sqlite", sqlite);
+        exe.root_module.addImport("quadtree", quadtree);
+        exe.root_module.addImport("zig-cli", cli);
+
+        exe.linkLibC();
+        b.installArtifact(exe);
+
+        const run_artifact = b.addRunArtifact(exe);
+        const run_step = b.step("run", "Run the application");
+        run_step.dependOn(&run_artifact.step);
+    }
 }
