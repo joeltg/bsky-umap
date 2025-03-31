@@ -1,6 +1,6 @@
 .{
-    .name = .quadtree_partitions,
-    .fingerprint = 0xd1b2eb7f2c3f940f,
+    .name = .atlas,
+    .fingerprint = 0x720ad60ffa93e653,
     .version = "0.0.0",
     .minimum_zig_version = "0.14.0",
     .paths = .{

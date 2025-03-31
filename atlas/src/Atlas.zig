@@ -14,21 +14,13 @@ pub const Area = packed struct {
     c: @Vector(2, f32) = .{ 0, 0 },
 
     pub fn locate(area: Area, point: @Vector(2, f32)) Quadrant {
-        const q = point < area.c;
-
-        if (q[0]) {
-            if (q[1]) {
-                return .sw;
-            } else {
-                return .nw;
-            }
-        } else {
-            if (q[1]) {
-                return .se;
-            } else {
-                return .ne;
-            }
-        }
+        const x, const y = point < area.c;
+        return switch (@as(u2, @intFromBool(y)) << 1 | @intFromBool(x)) {
+            0b00 => .ne,
+            0b01 => .nw,
+            0b10 => .se,
+            0b11 => .sw,
+        };
     }
 
     pub fn divide(area: Area, quadrant: Quadrant) Area {
@@ -79,13 +71,17 @@ pub const Body = packed struct {
 /// Leaf nodes have { id, x, y, 0 }.
 /// The last slot node.se = 0 distinguishes leaves from nodes,
 /// since nodes can never link to index zero.
-pub const Node = packed struct {
+pub const Node = struct {
     pub const NULL = std.math.maxInt(u32);
 
-    ne: u32 = NULL,
-    nw: u32 = NULL,
-    sw: u32 = NULL,
-    se: u32 = NULL,
+    // zig-fmt: off
+    data: [16]u8 = .{
+        0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff,
+    },
+    // zig-fmt: on
 
     pub fn create(body: Body) Node {
         var node = Node{};
@@ -93,49 +89,49 @@ pub const Node = packed struct {
         return node;
     }
 
-    pub inline fn isLeaf(node: Node) bool {
-        return node.se == 0;
+    pub inline fn isLeaf(self: Node) bool {
+        return self.getQuadrant(.se) == 0;
     }
 
     pub inline fn clear(self: *Node) void {
-        self.ne = NULL;
-        self.nw = NULL;
-        self.sw = NULL;
-        self.se = NULL;
+        self.setQuadrant(.ne, NULL);
+        self.setQuadrant(.nw, NULL);
+        self.setQuadrant(.sw, NULL);
+        self.setQuadrant(.se, NULL);
     }
 
     pub inline fn setLeaf(self: *Node, body: Body) void {
-        self.ne = body.id;
-        self.nw = @bitCast(body.position[0]);
-        self.sw = @bitCast(body.position[1]);
-        self.se = 0;
+        self.setQuadrant(.ne, body.id);
+        self.setQuadrant(.nw, @bitCast(body.position[0]));
+        self.setQuadrant(.sw, @bitCast(body.position[1]));
+        self.setQuadrant(.se, 0);
     }
 
     pub inline fn getId(self: Node) u32 {
-        std.debug.assert(self.se == 0);
-        return self.ne;
+        std.debug.assert(self.getQuadrant(.se) == 0);
+        return self.getQuadrant(.ne);
     }
 
     pub inline fn getPosition(self: Node) @Vector(2, f32) {
-        std.debug.assert(self.se == 0);
-        return .{ @bitCast(self.nw), @bitCast(self.sw) };
+        std.debug.assert(self.getQuadrant(.se) == 0);
+        return .{ @bitCast(self.getQuadrant(.nw)), @bitCast(self.getQuadrant(.sw)) };
     }
 
     pub inline fn getQuadrant(node: Node, quadrant: Quadrant) u32 {
         return switch (quadrant) {
-            .ne => node.ne,
-            .nw => node.nw,
-            .sw => node.sw,
-            .se => node.se,
+            .ne => std.mem.readInt(u32, node.data[0..4], .little),
+            .nw => std.mem.readInt(u32, node.data[4..8], .little),
+            .sw => std.mem.readInt(u32, node.data[8..12], .little),
+            .se => std.mem.readInt(u32, node.data[12..16], .little),
         };
     }
 
-    pub inline fn setQuadrant(node: *Node, quadrant: Quadrant, index: u32) void {
+    pub inline fn setQuadrant(node: *Node, quadrant: Quadrant, value: u32) void {
         switch (quadrant) {
-            .ne => node.ne = index,
-            .nw => node.nw = index,
-            .sw => node.sw = index,
-            .se => node.se = index,
+            .ne => std.mem.writeInt(u32, node.data[0..4], value, .little),
+            .nw => std.mem.writeInt(u32, node.data[4..8], value, .little),
+            .sw => std.mem.writeInt(u32, node.data[8..12], value, .little),
+            .se => std.mem.writeInt(u32, node.data[12..16], value, .little),
         }
     }
 };
@@ -237,14 +233,22 @@ fn getNearestBodyNode(
             nearest_dist.* = dist;
         }
     } else if (area.getMinDistance(position) < nearest_dist.*) {
-        if (node.sw != Node.NULL)
-            getNearestBodyNode(nodes, area.divide(.sw), node.sw, position, mode, nearest, nearest_dist);
-        if (node.nw != Node.NULL)
-            getNearestBodyNode(nodes, area.divide(.nw), node.nw, position, mode, nearest, nearest_dist);
-        if (node.se != Node.NULL)
-            getNearestBodyNode(nodes, area.divide(.se), node.se, position, mode, nearest, nearest_dist);
-        if (node.ne != Node.NULL)
-            getNearestBodyNode(nodes, area.divide(.ne), node.ne, position, mode, nearest, nearest_dist);
+        switch (node.getQuadrant(.sw)) {
+            Node.NULL => {},
+            else => |child| getNearestBodyNode(nodes, area.divide(.sw), child, position, mode, nearest, nearest_dist),
+        }
+        switch (node.getQuadrant(.nw)) {
+            Node.NULL => {},
+            else => |child| getNearestBodyNode(nodes, area.divide(.nw), child, position, mode, nearest, nearest_dist),
+        }
+        switch (node.getQuadrant(.se)) {
+            Node.NULL => {},
+            else => |child| getNearestBodyNode(nodes, area.divide(.se), child, position, mode, nearest, nearest_dist),
+        }
+        switch (node.getQuadrant(.ne)) {
+            Node.NULL => {},
+            else => |child| getNearestBodyNode(nodes, area.divide(.ne), child, position, mode, nearest, nearest_dist),
+        }
     }
 }
 

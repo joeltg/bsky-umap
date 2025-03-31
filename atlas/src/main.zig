@@ -117,7 +117,6 @@ const TileWalker = struct {
         const s = 2 * @max(@abs(min_x), @abs(max_x), @abs(min_y), @abs(max_y));
         const area = quadtree.Area{
             .c = .{ 0, 0 },
-            // .s = s,
             .s = if (s > 0) std.math.pow(f32, 2, @ceil(std.math.log2(s))) else 0,
         };
 
