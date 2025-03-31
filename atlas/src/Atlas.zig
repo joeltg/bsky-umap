@@ -136,6 +136,12 @@ pub const Node = struct {
     }
 };
 
+comptime {
+    if (@sizeOf(Node) != 16) {
+        @compileError("expected @sizeOf(Node) == 16");
+    }
+}
+
 pub const Error = std.mem.Allocator.Error || error{ Empty, OutOfBounds };
 
 area: Area,
