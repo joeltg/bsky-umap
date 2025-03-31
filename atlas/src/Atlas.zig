@@ -3,10 +3,10 @@ const std = @import("std");
 const Atlas = @This();
 
 pub const Quadrant = enum(u2) {
-    sw = 0,
-    nw = 1,
-    se = 2,
-    ne = 3,
+    ne,
+    nw,
+    sw,
+    se,
 };
 
 pub const Area = packed struct {
