@@ -58,87 +58,88 @@ pub const Area = packed struct {
 };
 
 pub const Body = packed struct {
-    id: u32 = Node.NULL,
+    id: u32 = 0,
     position: @Vector(2, f32) = .{ 0, 0 },
 };
 
-/// We can pack both nodes and leaves into 16 bytes total,
+/// We can pack both nodes and leaves into 12 bytes total,
 /// while still distinguishing between them.
 ///
-/// Intermediate nodes hold up to four links,
-/// and use Node.NULL for empty slots.
+/// Intermediate nodes hold up to four u24 links,
+/// each with a leading bit set to 0, use 0 for empty slots.
 ///
-/// Leaf nodes have { id, x, y, 0 }.
-/// The last slot node.se = 0 distinguishes leaves from nodes,
-/// since nodes can never link to index zero.
+/// Leaves have { id, x, y } of 4 bytes each. the id is always
+/// flagged with 0x80000000 so it can be distinguished from nodes.
 pub const Node = struct {
-    pub const NULL = std.math.maxInt(u32);
 
     // zig-fmt: off
-    data: [16]u8 = .{
-        0xff, 0xff, 0xff, 0xff,
+    data: [12]u8 = .{
         0xff, 0xff, 0xff, 0xff,
         0xff, 0xff, 0xff, 0xff,
         0xff, 0xff, 0xff, 0xff,
     },
     // zig-fmt: on
 
+    const max_id = (1 << 31) ^ std.math.maxInt(u32);
     pub fn create(body: Body) Node {
+        std.debug.assert(body.id <= max_id);
+
         var node = Node{};
-        node.setLeaf(body);
+
+        const flag: u32 = comptime (1 << 31);
+        std.mem.writeInt(u32, node.data[0..4], flag | body.id, .big);
+        std.mem.writeInt(u32, node.data[4..8], @bitCast(body.position[0]), .big);
+        std.mem.writeInt(u32, node.data[8..12], @bitCast(body.position[1]), .big);
+
         return node;
     }
 
     pub inline fn isLeaf(self: Node) bool {
-        return self.getQuadrant(.se) == 0;
+        return 0x80 & self.data[0] != 0;
     }
 
     pub inline fn clear(self: *Node) void {
-        self.setQuadrant(.ne, NULL);
-        self.setQuadrant(.nw, NULL);
-        self.setQuadrant(.sw, NULL);
-        self.setQuadrant(.se, NULL);
-    }
-
-    pub inline fn setLeaf(self: *Node, body: Body) void {
-        self.setQuadrant(.ne, body.id);
-        self.setQuadrant(.nw, @bitCast(body.position[0]));
-        self.setQuadrant(.sw, @bitCast(body.position[1]));
+        self.setQuadrant(.ne, 0);
+        self.setQuadrant(.nw, 0);
+        self.setQuadrant(.sw, 0);
         self.setQuadrant(.se, 0);
     }
 
     pub inline fn getId(self: Node) u32 {
-        std.debug.assert(self.getQuadrant(.se) == 0);
-        return self.getQuadrant(.ne);
+        const flag: u32 = comptime (1 << 31);
+        const mask = std.math.maxInt(u32) ^ flag;
+        return mask & std.mem.readInt(u32, self.data[0..4], .big);
     }
 
     pub inline fn getPosition(self: Node) @Vector(2, f32) {
-        std.debug.assert(self.getQuadrant(.se) == 0);
-        return .{ @bitCast(self.getQuadrant(.nw)), @bitCast(self.getQuadrant(.sw)) };
-    }
-
-    pub inline fn getQuadrant(node: Node, quadrant: Quadrant) u32 {
-        return switch (quadrant) {
-            .ne => std.mem.readInt(u32, node.data[0..4], .little),
-            .nw => std.mem.readInt(u32, node.data[4..8], .little),
-            .sw => std.mem.readInt(u32, node.data[8..12], .little),
-            .se => std.mem.readInt(u32, node.data[12..16], .little),
+        return .{
+            @bitCast(std.mem.readInt(u32, self.data[4..8], .big)),
+            @bitCast(std.mem.readInt(u32, self.data[8..12], .big)),
         };
     }
 
-    pub inline fn setQuadrant(node: *Node, quadrant: Quadrant, value: u32) void {
+    pub inline fn getQuadrant(node: Node, quadrant: Quadrant) u24 {
+        return switch (quadrant) {
+            .ne => std.mem.readInt(u24, node.data[0..3], .big),
+            .nw => std.mem.readInt(u24, node.data[3..6], .big),
+            .sw => std.mem.readInt(u24, node.data[6..9], .big),
+            .se => std.mem.readInt(u24, node.data[9..12], .big),
+        };
+    }
+
+    pub inline fn setQuadrant(node: *Node, quadrant: Quadrant, value: u24) void {
         switch (quadrant) {
-            .ne => std.mem.writeInt(u32, node.data[0..4], value, .little),
-            .nw => std.mem.writeInt(u32, node.data[4..8], value, .little),
-            .sw => std.mem.writeInt(u32, node.data[8..12], value, .little),
-            .se => std.mem.writeInt(u32, node.data[12..16], value, .little),
+            .ne => std.mem.writeInt(u24, node.data[0..3], value, .big),
+            .nw => std.mem.writeInt(u24, node.data[3..6], value, .big),
+            .sw => std.mem.writeInt(u24, node.data[6..9], value, .big),
+            .se => std.mem.writeInt(u24, node.data[9..12], value, .big),
         }
     }
 };
 
 comptime {
-    if (@sizeOf(Node) != 16) {
-        @compileError("expected @sizeOf(Node) == 16");
+    if (@sizeOf(Node) != 12) {
+        @compileError("expected @sizeOf(Node) == 12");
     }
 }
 
@@ -174,7 +175,7 @@ pub fn insert(self: *Atlas, body: Body) !void {
     }
 }
 
-fn insertNode(self: *Atlas, idx: u32, area: Area, body: Body) !void {
+fn insertNode(self: *Atlas, idx: u24, area: Area, body: Body) !void {
     std.debug.assert(idx < self.tree.items.len);
     std.debug.assert(area.s > 0);
 
@@ -186,20 +187,20 @@ fn insertNode(self: *Atlas, idx: u32, area: Area, body: Body) !void {
         if (@reduce(.And, node_position == body.position))
             return error.Collision;
 
-        const index: u32 = @intCast(self.tree.items.len);
+        const child_idx: u24 = @intCast(self.tree.items.len);
         try self.tree.append(node);
 
         self.tree.items[idx].clear();
-        self.tree.items[idx].setQuadrant(node_quadrant, index);
+        self.tree.items[idx].setQuadrant(node_quadrant, child_idx);
     }
 
     const body_quadrant = area.locate(body.position);
     const child = self.tree.items[idx].getQuadrant(body_quadrant);
 
-    if (child != Node.NULL) {
+    if (child != 0) {
         try self.insertNode(child, area.divide(body_quadrant), body);
     } else {
-        const index: u32 = @intCast(self.tree.items.len);
+        const index: u24 = @intCast(self.tree.items.len);
         try self.tree.append(Node.create(body));
         self.tree.items[idx].setQuadrant(body_quadrant, index);
     }
@@ -240,57 +241,57 @@ fn getNearestBodyNode(
         }
     } else if (area.getMinDistance(position) < nearest_dist.*) {
         switch (node.getQuadrant(.sw)) {
-            Node.NULL => {},
+            0 => {},
             else => |child| getNearestBodyNode(nodes, area.divide(.sw), child, position, mode, nearest, nearest_dist),
         }
         switch (node.getQuadrant(.nw)) {
-            Node.NULL => {},
+            0 => {},
             else => |child| getNearestBodyNode(nodes, area.divide(.nw), child, position, mode, nearest, nearest_dist),
         }
         switch (node.getQuadrant(.se)) {
-            Node.NULL => {},
+            0 => {},
             else => |child| getNearestBodyNode(nodes, area.divide(.se), child, position, mode, nearest, nearest_dist),
         }
         switch (node.getQuadrant(.ne)) {
-            Node.NULL => {},
+            0 => {},
             else => |child| getNearestBodyNode(nodes, area.divide(.ne), child, position, mode, nearest, nearest_dist),
         }
     }
 }
 
-pub fn print(self: *Atlas, log: std.fs.File.Writer) !void {
-    try self.printNode(log, 0, 1);
-}
+// pub fn print(self: *Atlas, log: std.fs.File.Writer) !void {
+//     try self.printNode(log, 0, 1);
+// }
 
-fn printNode(self: *Atlas, log: std.fs.File.Writer, idx: u32, depth: usize) !void {
-    const node = self.tree.items[idx];
-    if (node.isLeaf()) {
-        try log.print("leaf {d} - {d}\n", .{ idx, node.getId() });
-        return;
-    }
+// fn printNode(self: *Atlas, log: std.fs.File.Writer, idx: u32, depth: usize) !void {
+//     const node = self.tree.items[idx];
+//     if (node.isLeaf()) {
+//         try log.print("leaf {d} - {d}\n", .{ idx, node.getId() });
+//         return;
+//     }
 
-    try log.print("node {d}\n", .{idx});
-    if (node.sw != Node.NULL) {
-        try log.writeByteNTimes(' ', depth * 2);
-        try log.print("sw: ", .{});
-        try self.printNode(log, node.sw, depth + 1);
-    }
-    if (node.nw != Node.NULL) {
-        try log.writeByteNTimes(' ', depth * 2);
-        try log.print("nw: ", .{});
-        try self.printNode(log, node.nw, depth + 1);
-    }
-    if (node.se != Node.NULL) {
-        try log.writeByteNTimes(' ', depth * 2);
-        try log.print("se: ", .{});
-        try self.printNode(log, node.se, depth + 1);
-    }
-    if (node.ne != Node.NULL) {
-        try log.writeByteNTimes(' ', depth * 2);
-        try log.print("ne: ", .{});
-        try self.printNode(log, node.ne, depth + 1);
-    }
-}
+//     try log.print("node {d}\n", .{idx});
+//     if (node.sw != Node.NULL) {
+//         try log.writeByteNTimes(' ', depth * 2);
+//         try log.print("sw: ", .{});
+//         try self.printNode(log, node.sw, depth + 1);
+//     }
+//     if (node.nw != Node.NULL) {
+//         try log.writeByteNTimes(' ', depth * 2);
+//         try log.print("nw: ", .{});
+//         try self.printNode(log, node.nw, depth + 1);
+//     }
+//     if (node.se != Node.NULL) {
+//         try log.writeByteNTimes(' ', depth * 2);
+//         try log.print("se: ", .{});
+//         try self.printNode(log, node.se, depth + 1);
+//     }
+//     if (node.ne != Node.NULL) {
+//         try log.writeByteNTimes(' ', depth * 2);
+//         try log.print("ne: ", .{});
+//         try self.printNode(log, node.ne, depth + 1);
+//     }
+// }
 
 pub fn getNorm(comptime R: u3, f: @Vector(R, f32)) f32 {
     return std.math.sqrt(@reduce(.Add, f * f));

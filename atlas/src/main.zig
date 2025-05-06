@@ -184,14 +184,14 @@ const TileWalker = struct {
 
         var count: u32 = 0;
         for (self.node_indices) |i| {
-            const id = std.mem.readInt(u32, @ptrCast(self.ids.data[i * 4 .. i * 4 + 4]), .little);
-            const x: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(self.positions.data[i * 8 .. i * 8 + 4]), .little));
-            const y: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(self.positions.data[i * 8 + 4 .. i * 8 + 8]), .little));
+            const id = std.mem.readInt(u32, self.ids.data[i * 4 ..][0..4], .little);
+            const x: f32 = @bitCast(std.mem.readInt(u32, self.positions.data[i * 8 ..][0..4], .little));
+            const y: f32 = @bitCast(std.mem.readInt(u32, self.positions.data[i * 8 ..][4..8], .little));
             const position = @Vector(2, f32){ x, y };
 
             if (area.contains(position)) {
-                try self.tile_nodes.appendSlice(self.positions.data[i * 8 .. i * 8 + 8]);
-                try self.tile_nodes.appendSlice(self.colors.data[i * 4 .. i * 4 + 4]);
+                try self.tile_nodes.appendSlice(self.positions.data[i * 8 ..][0..8]);
+                try self.tile_nodes.appendSlice(self.colors.data[i * 4 ..][0..4]);
                 try self.atlas.insert(.{ .id = id, .position = position });
                 count += 1;
                 if (count >= config.capacity) {
