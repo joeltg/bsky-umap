@@ -1,0 +1,17 @@
+[project]
+name = "bsky-umap"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "csrgraph>=0.1.28",
+    "gensim==4.3.3",
+    "hsluv==5.0.4",
+    "nodevectors==0.1.23",
+    "numpy>=1.26.4",
+    "pyarrow==19.0.0",
+    "python-dotenv==1.0.1",
+    "scikit-learn>=1.6.1",
+    "scipy>=1.13.1",
+]
