@@ -1,7 +1,17 @@
-DATA        := ./data
-DIM         := 32
-N_NEIGHBORS := 25
-N_CLUSTERS  := 128
+#!make
+include .env
+
+ifndef DATA
+$(error DATA is not set)
+endif
+
+ifndef DIM
+$(error DIM is not set)
+endif
+
+ifndef N_NEIGHBORS
+$(error N_NEIGHBORS is not set)
+endif
 
 init: $(DATA)/directory.sqlite $(DATA)/edges.arrow $(DATA)/nodes.arrow $(DATA)/ids.buffer
 embeddings: $(DATA)/high_embeddings-$(DIM).npy
