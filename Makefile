@@ -13,6 +13,7 @@ ifndef N_NEIGHBORS
 $(error N_NEIGHBORS is not set)
 endif
 
+all: colors umap
 init: $(DATA)/directory.sqlite $(DATA)/edges.arrow $(DATA)/nodes.arrow $(DATA)/ids.buffer
 embeddings: $(DATA)/high_embeddings-$(DIM).npy
 colors: $(DATA)/colors.buffer
