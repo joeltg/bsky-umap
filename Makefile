@@ -34,25 +34,25 @@ $(DATA)/edges.arrow $(DATA)/nodes.arrow $(DATA)/ids.buffer: $(DATA)/graph.sqlite
 	python sqlite_to_arrow.py $(DATA)
 
 $(DATA)/high_embeddings-$(DIM).npy: $(DATA)/nodes.arrow $(DATA)/edges.arrow
-	DIM=$(DIM) python embedding.py $(DATA)
+	python embedding.py $(DATA)
 
 $(DATA)/knn_indices-$(DIM)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(N_NEIGHBORS).npy: $(DATA)/high_embeddings-$(DIM).npy
-	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python knn.py $(DATA)
+	python knn.py $(DATA)
 
 $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy: $(DATA)/high_embeddings-$(DIM).npy $(DATA)/knn_indices-$(DIM)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(N_NEIGHBORS).npy
-	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python project.py $(DATA)
+	python project.py $(DATA)
 
 $(DATA)/positions.buffer: $(DATA)/positions.sqlite $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy
-	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python anneal.py $(DATA)
+	python anneal.py $(DATA)
 
 $(DATA)/positions.sqlite: $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy
-	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) python save_graph.py $(DATA)
+	python save_graph.py $(DATA)
 
 $(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy: $(DATA)/high_embeddings-$(DIM).npy
-	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) N_CLUSTERS=$(N_CLUSTERS) python labels.py $(DATA)
+	python labels.py $(DATA)
 
 $(DATA)/colors.buffer: $(DATA)/nodes.arrow $(DATA)/high_embeddings-$(DIM).npy $(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy
-	DIM=$(DIM) N_NEIGHBORS=$(N_NEIGHBORS) N_CLUSTERS=$(N_CLUSTERS) python colors.py $(DATA)
+	python colors.py $(DATA)
 
 $(DATA)/atlas.sqlite: $(DATA)/positions.sqlite
 	sqlite3 $(DATA)/atlas.sqlite 'CREATE VIRTUAL TABLE nodes USING rtree(id INTEGER PRIMARY KEY, minX FLOAT NOT NULL, maxX FLOAT NOT NULL, minY FLOAT NOT NULL, maxY FLOAT NOT NULL);'
