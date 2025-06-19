@@ -160,7 +160,7 @@ def ggvec_main(src, dst, data, n_nodes, n_components=2,
                negative_decay=0.,
                exponent=0.5,
                max_loss=30.,
-               max_epoch=500, verbose=True):
+               max_epoch=500):
     """
     GGVec: Fast global first (and higher) order local embeddings.
 
@@ -215,10 +215,7 @@ def ggvec_main(src, dst, data, n_nodes, n_components=2,
 
     latest_loss = [np.float32(np.inf)] * tol_samples
 
-    if verbose:
-        epoch_range = tqdm.trange(0, max_epoch)
-    else:
-        epoch_range = range(0, max_epoch)
+    epoch_range = tqdm.trange(0, max_epoch)
 
     for epoch in epoch_range:
         # Relaxation pass
@@ -247,14 +244,12 @@ def ggvec_main(src, dst, data, n_nodes, n_components=2,
             and (np.abs((max_latest - min_latest) / max_latest) < tol)
             ):
             if loss < max_loss:
-                if verbose:
-                    print(f"Converged! Loss: {loss:.4f}")
+                print(f"Converged! Loss: {loss:.4f}")
                 return w
             else:
                 err_str = (f"Could not learn: loss {loss} = max loss {max_loss}\n"
                             + "This is often due to too large learning rates.")
-                if verbose:
-                    print(err_str)
+                print(err_str)
                 warnings.warn(err_str)
                 break
         elif not np.isfinite(loss).all():
@@ -266,7 +261,6 @@ def ggvec_main(src, dst, data, n_nodes, n_components=2,
         else:
             latest_loss.append(loss)
             latest_loss = latest_loss[1:]
-            if verbose:
-                epoch_range.set_description(f"Loss: {loss:.4f}\t")
+            epoch_range.set_description(f"Loss: {loss:.4f}\t")
     warnings.warn(f"GVec has not converged. Losses : {latest_loss}")
     return w

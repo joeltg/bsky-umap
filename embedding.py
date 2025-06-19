@@ -46,7 +46,6 @@ def main():
         src = sources, dst = targets, data = weights,
         n_nodes = len(node_ids),
         n_components=dim,
-        verbose=True,
         **ggvec_kwargs
     )
 
