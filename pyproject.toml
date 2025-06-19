@@ -5,7 +5,6 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "gensim==4.3.3",
     "hsluv==5.0.4",
     "numba>=0.61.2",
     "numpy>=1.26.4",
