@@ -9,7 +9,7 @@ from functools import partial
 
 from sklearn.neighbors import NearestNeighbors
 
-from utils import read_nodes
+from utils import NodeReader
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -147,7 +147,8 @@ def main():
     directory = arguments[0]
 
     nodes_path = os.path.join(directory, "nodes.arrow")
-    (ids, incoming_degrees) = read_nodes(nodes_path)
+    with NodeReader(nodes_path) as reader:
+        (ids, incoming_degrees) = reader.get_nodes()
 
     high_embeddings_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
     high_embeddings: NDArray[np.float32] = np.load(high_embeddings_path)

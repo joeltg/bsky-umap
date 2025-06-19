@@ -5,14 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "csrgraph>=0.1.28",
     "gensim==4.3.3",
     "hsluv==5.0.4",
-    "nodevectors==0.1.23",
+    "numba>=0.61.2",
     "numpy>=1.26.4",
     "pyarrow==19.0.0",
     "python-dotenv==1.0.1",
     "scikit-learn>=1.6.1",
-    "scipy>=1.13.1",
+    "tqdm>=4.67.1",
     "umap-learn>=0.5.7",
 ]

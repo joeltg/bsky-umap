@@ -6,7 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from quadtree.quadtree import QuadTree
-from utils import read_nodes
+from utils import NodeReader
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -65,6 +65,7 @@ class Engine:
             self.positions[i][1] += dy * temperature;
 
 
+
 def main():
     n_neighbors = int(os.environ['N_NEIGHBORS'])
     n_threads = int(os.environ['N_THREADS'])
@@ -77,7 +78,9 @@ def main():
     directory = arguments[0]
 
     nodes_path = os.path.join(directory, "nodes.arrow")
-    (ids, incoming_degrees) = read_nodes(nodes_path)
+    with NodeReader(nodes_path) as reader:
+        (ids, incoming_degrees) = reader.get_nodes()
+
     # incoming_degrees_norm: NDArray[np.float32] = incoming_degrees.astype(np.float32) / np.max(incoming_degrees).astype(np.float32)
     # node_mass: NDArray[np.float32] = 100 * np.sqrt(incoming_degrees_norm).astype(np.float32)
 
@@ -102,20 +105,22 @@ def main():
     database_path = os.path.join(directory, 'positions.sqlite')
     conn = sqlite3.connect(database_path)
 
+    scale = 4
+
     try:
         # Fill indices array
         cursor = conn.cursor()
         cursor.execute("SELECT id, x, y FROM nodes ORDER BY id ASC")
         for i, (id, x, y) in enumerate(cursor):
-            positions[i][0] = x
-            positions[i][1] = y
+            positions[i][0] = x * scale
+            positions[i][1] = y * scale
             # positions_x[i] = x
             # positions_y[i] = y
     finally:
         conn.close()
 
     path = os.path.join(directory, "positions.buffer")
-    positions.tofile(path)
+    positions.astype('<f4').tofile(path)
     # x_path = os.path.join(directory, "positions_y.buffer")
     # y_path = os.path.join(directory, "positions_x.buffer")
     # positions_x.tofile(x_path)

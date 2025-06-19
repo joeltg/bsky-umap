@@ -5,7 +5,7 @@ import sqlite3
 import numpy as np
 from numpy.typing import NDArray
 
-from utils import read_nodes, read_edges
+from utils import NodeReader
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -25,7 +25,8 @@ def main():
     directory = arguments[0]
 
     nodes_path = os.path.join(directory, "nodes.arrow")
-    (ids, incoming_degrees) = read_nodes(nodes_path)
+    with NodeReader(nodes_path) as reader:
+        (node_ids, incoming_degrees) = reader.get_nodes()
 
     low_embeddings_path = os.path.join(directory, f"low_embeddings-{dim}-{n_neighbors}.npy")
     low_embeddings: NDArray[np.float32] = np.load(low_embeddings_path)
@@ -48,7 +49,7 @@ def main():
         # Prepare the data for insertion
         scale = 1000
         # nodes = [(int(id), float(p[0] * scale), float(p[1] * scale), float(d + 1)) for id, d, p in zip(ids, incoming_degrees, low_embeddings)]
-        nodes = [(int(id), float(p[0] * scale), float(p[1] * scale), 1) for id, p in zip(ids, low_embeddings)]
+        nodes = [(int(id), float(p[0] * scale), float(p[1] * scale), 1) for id, p in zip(node_ids, low_embeddings)]
 
         # Insert the data into the table
         cursor.executemany("INSERT INTO nodes (id, x, y, mass) VALUES (?, ?, ?, ?)", nodes)

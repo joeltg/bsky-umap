@@ -1,19 +1,16 @@
 import sys
 import os
-import nodevectors
 
 import numpy as np
-import csrgraph as cg
-from scipy.sparse import coo_matrix
 
-from utils import read_nodes, read_edges
+from ggvec import ggvec_main
+from utils import NodeReader, EdgeReader
 
 from dotenv import load_dotenv
 load_dotenv()
 
 def main():
     dim = int(os.environ['DIM'])
-    n_threads = int(os.environ['N_THREADS'])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -22,25 +19,24 @@ def main():
     directory = arguments[0]
 
     nodes_path = os.path.join(directory, "nodes.arrow")
-    (node_ids, incoming_degrees) = read_nodes(nodes_path)
+    with NodeReader(nodes_path) as reader:
+        (node_ids, incoming_degrees) = reader.get_nodes()
 
     edges_path = os.path.join(directory, "edges.arrow")
-    (weights, sources, targets) = read_edges(edges_path, node_ids)
-
-    cm = coo_matrix((weights, (sources, targets)), shape=(len(node_ids), len(node_ids)))
+    with EdgeReader(edges_path) as reader:
+        (weights, sources, targets) = reader.get_edges()
 
     print("node ids", node_ids.shape)
-    print("weights", cm.data.shape)
-    print("rows", cm.row.shape)
-    print("cols", cm.col.shape)
+    print("weights", weights.shape)
+    print("sources", sources.shape)
+    print("targets", targets.shape)
 
-    G = cg.csrgraph(cm.tocsr(), node_ids, copy=False)
-
-    embeddings = nodevectors.GGVec(
+    embeddings = ggvec_main(
+        src = sources, dst = targets, data = weights,
+        n_nodes = len(node_ids),
         n_components=dim,
-        threads=n_threads,
         verbose=True,
-    ).fit_transform(G)
+    )
 
     embedding_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
     print("saving", embedding_path)
