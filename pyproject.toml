@@ -14,3 +14,22 @@ dependencies = [
     "tqdm>=4.67.1",
     "umap-learn>=0.5.7",
 ]
+
+[tool.ruff]
+line-length = 88
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+]
+
+# Ignore f-string without placeholders
+ignore = ["F541"]
+ 
+[dependency-groups]
+dev = [
+    "ruff>=0.12.0",
+]

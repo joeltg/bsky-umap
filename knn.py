@@ -30,9 +30,9 @@ def main():
     knn = nearest_neighbors(
         high_embeddings,
         n_neighbors=n_neighbors,
-        metric="euclidean",
+        metric="cosine",
         metric_kwds=None,
-        angular=False,
+        angular=True,
         random_state=None,
         verbose=True,
         n_jobs=n_threads,

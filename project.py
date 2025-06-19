@@ -38,6 +38,7 @@ def main():
         min_dist=0.5,
         n_epochs=n_epochs,
         n_jobs=n_threads,
+        metric='cosine',
         verbose=True
     )
 
