@@ -1,15 +1,16 @@
-import sys
 import os
-
 import sqlite3
+import sys
+
 import numpy as np
+from dotenv import load_dotenv
 from numpy.typing import NDArray
 
 from quadtree.quadtree import QuadTree
 from utils import NodeReader
-from dotenv import load_dotenv
 
 load_dotenv()
+
 
 def get_side_len(positions: NDArray[np.float32]) -> float:
     min_x = np.min(positions[:, 0])
@@ -22,6 +23,7 @@ def get_side_len(positions: NDArray[np.float32]) -> float:
 
     s = 2 * max(abs(min_x), abs(max_x), abs(min_y), abs(max_y))
     return s.astype(float)
+
 
 class Engine:
     mass: NDArray[np.float32]
@@ -58,18 +60,17 @@ class Engine:
             y = self.positions[i][1].astype(float)
             mass = self.mass[i].astype(float)
 
-            (dx, dy) = self.trees[0].get_force((x, y), mass);
+            (dx, dy) = self.trees[0].get_force((x, y), mass)
             self.forces[i][0] = dx
             self.forces[i][1] = dy
-            self.positions[i][0] += dx * temperature;
-            self.positions[i][1] += dy * temperature;
-
+            self.positions[i][0] += dx * temperature
+            self.positions[i][1] += dy * temperature
 
 
 def main():
-    n_neighbors = int(os.environ['N_NEIGHBORS'])
-    n_threads = int(os.environ['N_THREADS'])
-    dim = int(os.environ['DIM'])
+    n_neighbors = int(os.environ["N_NEIGHBORS"])
+    n_threads = int(os.environ["N_THREADS"])
+    dim = int(os.environ["DIM"])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -102,7 +103,7 @@ def main():
     # engine.tick()
     # engine.tick()
 
-    database_path = os.path.join(directory, 'positions.sqlite')
+    database_path = os.path.join(directory, "positions.sqlite")
     conn = sqlite3.connect(database_path)
 
     scale = 4
@@ -120,11 +121,12 @@ def main():
         conn.close()
 
     path = os.path.join(directory, "positions.buffer")
-    positions.astype('<f4').tofile(path)
+    positions.astype("<f4").tofile(path)
     # x_path = os.path.join(directory, "positions_y.buffer")
     # y_path = os.path.join(directory, "positions_x.buffer")
     # positions_x.tofile(x_path)
     # positions_y.tofile(y_path)
+
 
 if __name__ == "__main__":
     main()

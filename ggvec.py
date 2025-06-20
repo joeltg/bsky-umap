@@ -1,11 +1,12 @@
-import numba
-from numba import jit
-import numpy as np
-
-import tqdm
 import warnings
 
-@jit(nopython=True, nogil=True, fastmath=True, inline='always')
+import numba
+import numpy as np
+import tqdm
+from numba import jit
+
+
+@jit(nopython=True, nogil=True, fastmath=True, inline="always")
 def _dot_product_simd(w1, w2):
     """SIMD-friendly dot product"""
     sum = np.float32(0.0)
@@ -14,7 +15,7 @@ def _dot_product_simd(w1, w2):
     return sum
 
 
-@jit(nopython=True, nogil=True, fastmath=True, inline='always')
+@jit(nopython=True, nogil=True, fastmath=True, inline="always")
 def _update_embedding_fused(lr_loss, w1, w2):
     """Fused multiply-subtract-clamp operation"""
     for k in range(w1.size):
@@ -29,19 +30,22 @@ def _update_embedding_fused(lr_loss, w1, w2):
 def _fast_random_pair(nnodes, state):
     """Linear congruential generator for fast random pairs"""
     # Update state
-    state[0] = (state[0] * np.uint32(1664525) + np.uint32(1013904223)) & np.uint32(0xFFFFFFFF)
+    state[0] = (state[0] * np.uint32(1664525) + np.uint32(1013904223)) & np.uint32(
+        0xFFFFFFFF
+    )
     node1 = (state[0] >> np.uint32(16)) % nnodes
     # Generate second number
-    state[0] = (state[0] * np.uint32(1664525) + np.uint32(1013904223)) & np.uint32(0xFFFFFFFF)
+    state[0] = (state[0] * np.uint32(1664525) + np.uint32(1013904223)) & np.uint32(
+        0xFFFFFFFF
+    )
     node2 = (state[0] >> np.uint32(16)) % nnodes
     return node1, node2
 
 
 @jit(nopython=True, nogil=True, fastmath=True, parallel=True)
-def _ggvec_edges_update_batched(src, dst, data, w, b,
-                                learning_rate=0.01,
-                                exponent=0.5,
-                                max_loss=10.):
+def _ggvec_edges_update_batched(
+    src, dst, data, w, b, learning_rate=0.01, exponent=0.5, max_loss=10.0
+):
     """
     Batched edge updates with SIMD dot products and fused operations.
 
@@ -74,7 +78,9 @@ def _ggvec_edges_update_batched(src, dst, data, w, b,
             node2 = src[edge]
 
             # SIMD dot product with scaling
-            pred = (_dot_product_simd(w[node1], w[node2]) + b[node1] + b[node2]) * inv_scale_factor
+            pred = (
+                _dot_product_simd(w[node1], w[node2]) + b[node1] + b[node2]
+            ) * inv_scale_factor
 
             # Compute loss with edge weight transformation
             target = data[edge] ** exponent
@@ -97,6 +103,7 @@ def _ggvec_edges_update_batched(src, dst, data, w, b,
 
     return total_loss / np.float32(n_edges)
 
+
 ###########################
 #                         #
 #    /\ Contraction pass  #
@@ -105,10 +112,9 @@ def _ggvec_edges_update_batched(src, dst, data, w, b,
 #                         #
 ###########################
 
+
 @jit(nopython=True, nogil=True, fastmath=True, parallel=True)
-def _ggvec_reverse_batched(n_edges, w, b,
-                          learning_rate=0.01,
-                          max_loss=10.):
+def _ggvec_reverse_batched(n_edges, w, b, learning_rate=0.01, max_loss=10.0):
     """
     Negative sampling with fast RNG and batched updates
     """
@@ -123,7 +129,9 @@ def _ggvec_reverse_batched(n_edges, w, b,
         # Each thread gets its own RNG state
         thread_id = np.uint32(numba.get_thread_id())
         rng_state = np.zeros(1, dtype=np.uint32)
-        rng_state[0] = np.uint32(1337) + thread_id * np.uint32(17) + batch_idx * np.uint32(31)
+        rng_state[0] = (
+            np.uint32(1337) + thread_id * np.uint32(17) + batch_idx * np.uint32(31)
+        )
 
         batch_start = batch_idx * batch_size
         batch_end = min(batch_start + batch_size, n_edges)
@@ -133,7 +141,9 @@ def _ggvec_reverse_batched(n_edges, w, b,
             node1, node2 = _fast_random_pair(nnodes, rng_state)
 
             # We assume no edge (weight = 0) between nodes on negative sampling pass
-            loss = (_dot_product_simd(w[node1], w[node2]) + b[node1] + b[node2]) * inv_scale_factor
+            loss = (
+                _dot_product_simd(w[node1], w[node2]) + b[node1] + b[node2]
+            ) * inv_scale_factor
 
             # Branchless clamping
             loss = min(max(loss, -max_loss), max_loss)
@@ -147,20 +157,29 @@ def _ggvec_reverse_batched(n_edges, w, b,
             b[node1] -= lr_loss
             b[node2] -= lr_loss
 
+
 ##########################
 #                        #
 #       Main method      #
 #                        #
 ##########################
 
-def ggvec_main(src, dst, data, n_nodes, n_components=2,
-               learning_rate=0.05,
-               tol=0.03, tol_samples=75,
-               negative_ratio=0.15,
-               negative_decay=0.,
-               exponent=0.5,
-               max_loss=30.,
-               max_epoch=500):
+
+def ggvec_main(
+    src,
+    dst,
+    data,
+    n_nodes,
+    n_components=2,
+    learning_rate=0.05,
+    tol=0.03,
+    tol_samples=75,
+    negative_ratio=0.15,
+    negative_decay=0.0,
+    exponent=0.5,
+    max_loss=30.0,
+    max_epoch=500,
+):
     """
     GGVec: Fast global first (and higher) order local embeddings.
 
@@ -210,7 +229,7 @@ def ggvec_main(src, dst, data, n_nodes, n_components=2,
     data = data.astype(np.float32)
 
     nnodes = n_nodes
-    w = (np.random.rand(nnodes, n_components).astype(np.float32) - np.float32(0.5))
+    w = np.random.rand(nnodes, n_components).astype(np.float32) - np.float32(0.5)
     b = np.zeros(nnodes, dtype=np.float32)
 
     latest_loss = [np.float32(np.inf)] * tol_samples
@@ -220,35 +239,37 @@ def ggvec_main(src, dst, data, n_nodes, n_components=2,
     for epoch in epoch_range:
         # Relaxation pass
         # Number of negative edges
-        neg_edges = int(
-            dst.size
-            * negative_ratio
-            * ((1 - negative_decay) ** epoch)
-        )
+        neg_edges = int(dst.size * negative_ratio * ((1 - negative_decay) ** epoch))
         _ggvec_reverse_batched(
-            neg_edges, w, b,
-            learning_rate=learning_rate,
-            max_loss=max_loss)
+            neg_edges, w, b, learning_rate=learning_rate, max_loss=max_loss
+        )
 
         # Positive "contraction" pass
         loss = _ggvec_edges_update_batched(
-            src, dst, data, w, b,
+            src,
+            dst,
+            data,
+            w,
+            b,
             learning_rate=learning_rate,
             exponent=exponent,
-            max_loss=max_loss)
+            max_loss=max_loss,
+        )
 
         # Pct Change in loss
         max_latest = np.max(latest_loss)
         min_latest = np.min(latest_loss)
-        if ((epoch > tol_samples)
-            and (np.abs((max_latest - min_latest) / max_latest) < tol)
-            ):
+        if (epoch > tol_samples) and (
+            np.abs((max_latest - min_latest) / max_latest) < tol
+        ):
             if loss < max_loss:
                 print(f"Converged! Loss: {loss:.4f}")
                 return w
             else:
-                err_str = (f"Could not learn: loss {loss} = max loss {max_loss}\n"
-                            + "This is often due to too large learning rates.")
+                err_str = (
+                    f"Could not learn: loss {loss} = max loss {max_loss}\n"
+                    + "This is often due to too large learning rates."
+                )
                 print(err_str)
                 warnings.warn(err_str)
                 break
@@ -257,7 +278,8 @@ def ggvec_main(src, dst, data, n_nodes, n_components=2,
                 f"non finite loss: {latest_loss} on epoch {epoch}\n"
                 + f"Losses: {loss}\n"
                 + f"Previous losses: {[x for x in latest_loss if np.isfinite(x)]}"
-                + f"Try reducing the learning rate")
+                + f"Try reducing the learning rate"
+            )
         else:
             latest_loss.append(loss)
             latest_loss = latest_loss[1:]

@@ -1,15 +1,17 @@
-import sys
 import os
-
 import sqlite3
-import numpy as np
+import sys
 
+import numpy as np
 from dotenv import load_dotenv
+
 load_dotenv()
 
+
 def count(cursor: sqlite3.Cursor, table: str) -> int:
-    cursor.execute(f"SELECT COUNT(*) FROM \"{table}\"")
+    cursor.execute(f'SELECT COUNT(*) FROM "{table}"')
     return cursor.fetchone()[0]
+
 
 def main():
     arguments = sys.argv[1:]
@@ -17,7 +19,7 @@ def main():
         raise Exception("missing data directory")
 
     directory = arguments[0]
-    database_path = os.path.join(directory, 'graph.sqlite')
+    database_path = os.path.join(directory, "graph.sqlite")
 
     conn = sqlite3.connect(f"file:{database_path}?mode=ro", uri=True)
     cursor = conn.cursor()
@@ -38,6 +40,7 @@ def main():
     ids_path = os.path.join(directory, "ids.buffer")
     ids.tofile(ids_path)
     print("wrote", ids_path)
+
 
 if __name__ == "__main__":
     main()

@@ -1,22 +1,19 @@
 import os
 import sys
-import numpy as np
 
+import numpy as np
+from dotenv import load_dotenv
 from numpy.typing import NDArray
 from umap import UMAP
 
-
-from dotenv import load_dotenv
-
-from utils import write_edges
-
 load_dotenv()
 
+
 def main():
-    dim = int(os.environ['DIM'])
-    n_neighbors = int(os.environ['N_NEIGHBORS'])
-    n_epochs = int(os.environ['N_EPOCHS'])
-    n_threads = int(os.environ['N_THREADS'])
+    dim = int(os.environ["DIM"])
+    n_neighbors = int(os.environ["N_NEIGHBORS"])
+    n_epochs = int(os.environ["N_EPOCHS"])
+    n_threads = int(os.environ["N_THREADS"])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -38,8 +35,8 @@ def main():
         min_dist=0.5,
         n_epochs=n_epochs,
         n_jobs=n_threads,
-        metric='cosine',
-        verbose=True
+        metric="cosine",
+        verbose=True,
     )
 
     # (low_embeddings, graph, sigmas, rhos) = umap.fit_transform(high_embeddings)
@@ -47,13 +44,16 @@ def main():
 
     print("low_embeddings has shape", low_embeddings.shape)
 
-    low_embeddings_path = os.path.join(directory, f"low_embeddings-{dim}-{n_neighbors}.npy")
+    low_embeddings_path = os.path.join(
+        directory, f"low_embeddings-{dim}-{n_neighbors}.npy"
+    )
     print("saving", low_embeddings_path)
     np.save(low_embeddings_path, low_embeddings)
 
     # knn_edges_path = os.path.join(directory, f"knn_edges-{dim}-{n_neighbors}.arrow")
     # print("saving", knn_edges_path)
     # write_edges(knn_edges_path, (graph.data, graph.row, graph.col))
+
 
 if __name__ == "__main__":
     main()

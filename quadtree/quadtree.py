@@ -1,7 +1,8 @@
-from ctypes import CDLL, POINTER, c_int, c_float, c_void_p, byref
 import os
 import platform
+from ctypes import CDLL, POINTER, byref, c_float, c_int, c_void_p
 from math import isnan
+
 
 def get_lib_path():
     # Determine system and architecture
@@ -10,18 +11,14 @@ def get_lib_path():
 
     # Map architecture names
     arch_mapping = {
-        'x86_64': 'x86_64',
-        'amd64': 'x86_64',
-        'arm64': 'aarch64',
-        'aarch64': 'aarch64',
+        "x86_64": "x86_64",
+        "amd64": "x86_64",
+        "arm64": "aarch64",
+        "aarch64": "aarch64",
     }
 
     # Map system names
-    system_mapping = {
-        'darwin': 'macos',
-        'linux': 'linux',
-        'windows': 'windows'
-    }
+    system_mapping = {"darwin": "macos", "linux": "linux", "windows": "windows"}
 
     # Get standardized names
     arch = arch_mapping.get(machine)
@@ -31,12 +28,12 @@ def get_lib_path():
         raise RuntimeError(f"Unsupported platform: {system} {machine}")
 
     # Determine library file extension
-    if system == 'darwin':
-        lib_ext = '.dylib'
-    elif system == 'linux':
-        lib_ext = '.so'
-    elif system == 'windows':
-        lib_ext = '.dll'
+    if system == "darwin":
+        lib_ext = ".dylib"
+    elif system == "linux":
+        lib_ext = ".so"
+    elif system == "windows":
+        lib_ext = ".dll"
     else:
         raise RuntimeError(f"Unsupported system: {system}")
 
@@ -46,18 +43,14 @@ def get_lib_path():
     # Construct path relative to this script
     script_dir = os.path.dirname(os.path.abspath(__file__))
     lib_path = os.path.join(
-        script_dir,
-        "zig-rtree",
-        "zig-out",
-        "lib",
-        f"{arch}-{sys_name}",
-        lib_filename
+        script_dir, "zig-rtree", "zig-out", "lib", f"{arch}-{sys_name}", lib_filename
     )
 
     if not os.path.exists(lib_path):
         raise RuntimeError(f"Library not found at {lib_path}")
 
     return (lib_path, lib_filename)
+
 
 (lib_path, lib_filename) = get_lib_path()
 
@@ -89,20 +82,32 @@ _lib.quadtree_get_total_mass.argtypes = [c_void_p]
 _lib.quadtree_get_total_mass.restype = c_float
 
 _lib.quadtree_get_force.argtypes = [
-    c_void_p, c_float, c_float, c_float,
-    POINTER(c_float), POINTER(c_float),
+    c_void_p,
+    c_float,
+    c_float,
+    c_float,
+    POINTER(c_float),
+    POINTER(c_float),
 ]
 _lib.quadtree_get_force.restype = None
 
 _lib.quadtree_get_nearest_body_inclusive.argtypes = [
-    c_void_p, c_float, c_float,
-    POINTER(c_float), POINTER(c_float), POINTER(c_float)
+    c_void_p,
+    c_float,
+    c_float,
+    POINTER(c_float),
+    POINTER(c_float),
+    POINTER(c_float),
 ]
 _lib.quadtree_get_nearest_body_inclusive.restype = None
 
 _lib.quadtree_get_nearest_body_exclusive.argtypes = [
-    c_void_p, c_float, c_float,
-    POINTER(c_float), POINTER(c_float), POINTER(c_float)
+    c_void_p,
+    c_float,
+    c_float,
+    POINTER(c_float),
+    POINTER(c_float),
+    POINTER(c_float),
 ]
 _lib.quadtree_get_nearest_body_exclusive.restype = None
 
@@ -119,7 +124,7 @@ class QuadTree:
 
     def __del__(self):
         """Clean up the quadtree when the Python object is destroyed."""
-        if hasattr(self, '_ptr') and self._ptr:
+        if hasattr(self, "_ptr") and self._ptr:
             _lib.quadtree_deinit(self._ptr)
             self._ptr = None
 
@@ -154,7 +159,9 @@ class QuadTree:
         """Get the total mass stored in the quadtree."""
         return _lib.quadtree_get_total_mass(self._ptr)
 
-    def get_force(self, position: tuple[float, float], mass: float = 1.0) -> tuple[float, float]:
+    def get_force(
+        self, position: tuple[float, float], mass: float = 1.0
+    ) -> tuple[float, float]:
         """Get the force exerted on a body."""
         (x, y) = position
         result_x = c_float()
@@ -162,20 +169,27 @@ class QuadTree:
         _lib.quadtree_get_force(self._ptr, x, y, mass, byref(result_x), byref(result_y))
         return (result_x.value, result_y.value)
 
-    def get_nearest_body(self, position: tuple[float, float], inclusive: bool = True) -> tuple[float, float, float]:
+    def get_nearest_body(
+        self, position: tuple[float, float], inclusive: bool = True
+    ) -> tuple[float, float, float]:
         """Get the nearest body."""
         (x, y) = position
         result_x = c_float()
         result_y = c_float()
         result_mass = c_float()
         if inclusive:
-            _lib.quadtree_get_nearest_body_inclusive(self._ptr, x, y, byref(result_x), byref(result_y), byref(result_mass))
+            _lib.quadtree_get_nearest_body_inclusive(
+                self._ptr, x, y, byref(result_x), byref(result_y), byref(result_mass)
+            )
         else:
-            _lib.quadtree_get_nearest_body_exclusive(self._ptr, x, y, byref(result_x), byref(result_y), byref(result_mass))
+            _lib.quadtree_get_nearest_body_exclusive(
+                self._ptr, x, y, byref(result_x), byref(result_y), byref(result_mass)
+            )
 
         if isnan(result_x.value) or isnan(result_y.value) or isnan(result_mass.value):
             raise Exception("tree is empty")
         return (result_x.value, result_y.value, result_mass.value)
+
 
 # Example usage
 if __name__ == "__main__":

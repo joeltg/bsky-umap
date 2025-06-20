@@ -1,27 +1,28 @@
-import sys
 import os
+import sys
 
 import numpy as np
+from dotenv import load_dotenv
 
 from ggvec import ggvec_main
-from utils import NodeReader, EdgeReader
+from utils import EdgeReader, NodeReader
 
-from dotenv import load_dotenv
 load_dotenv()
 
+
 def main():
-    dim = int(os.environ['DIM'])
+    dim = int(os.environ["DIM"])
 
     # Build kwargs for ggvec parameters from environment variables
     ggvec_kwargs = {}
-    if 'LEARNING_RATE' in os.environ:
-        ggvec_kwargs['learning_rate'] = float(os.environ['LEARNING_RATE'])
-    if 'NEGATIVE_RATIO' in os.environ:
-        ggvec_kwargs['negative_ratio'] = float(os.environ['NEGATIVE_RATIO'])
-    if 'NEGATIVE_DECAY' in os.environ:
-        ggvec_kwargs['negative_decay'] = float(os.environ['NEGATIVE_DECAY'])
-    if 'MAX_LOSS' in os.environ:
-        ggvec_kwargs['max_loss'] = float(os.environ['MAX_LOSS'])
+    if "LEARNING_RATE" in os.environ:
+        ggvec_kwargs["learning_rate"] = float(os.environ["LEARNING_RATE"])
+    if "NEGATIVE_RATIO" in os.environ:
+        ggvec_kwargs["negative_ratio"] = float(os.environ["NEGATIVE_RATIO"])
+    if "NEGATIVE_DECAY" in os.environ:
+        ggvec_kwargs["negative_decay"] = float(os.environ["NEGATIVE_DECAY"])
+    if "MAX_LOSS" in os.environ:
+        ggvec_kwargs["max_loss"] = float(os.environ["MAX_LOSS"])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -43,15 +44,18 @@ def main():
     print("targets", targets.shape)
 
     embeddings = ggvec_main(
-        src = sources, dst = targets, data = weights,
-        n_nodes = len(node_ids),
+        src=sources,
+        dst=targets,
+        data=weights,
+        n_nodes=len(node_ids),
         n_components=dim,
-        **ggvec_kwargs
+        **ggvec_kwargs,
     )
 
     embedding_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
     print("saving", embedding_path)
     np.save(embedding_path, embeddings)
+
 
 if __name__ == "__main__":
     main()

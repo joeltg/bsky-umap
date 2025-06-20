@@ -1,20 +1,22 @@
 import os
 import sys
-import numpy as np
-from numpy.typing import NDArray
-from hsluv import hsluv_to_rgb
-
-from multiprocessing import Pool
 from functools import partial
+from multiprocessing import Pool
 
+import numpy as np
+from dotenv import load_dotenv
+from hsluv import hsluv_to_rgb
+from numpy.typing import NDArray
 from sklearn.neighbors import NearestNeighbors
 
 from utils import NodeReader
 
-from dotenv import load_dotenv
 load_dotenv()
 
-def derive_cluster_hues(cluster_centers: NDArray[np.float32], n_neighbors=15, n_cycles=1) -> NDArray[np.float32]:
+
+def derive_cluster_hues(
+    cluster_centers: NDArray[np.float32], n_neighbors=15, n_cycles=1
+) -> NDArray[np.float32]:
     """
     Derive hues (0-1) for clusters using MDS-style method on approximate neighbors.
 
@@ -31,7 +33,7 @@ def derive_cluster_hues(cluster_centers: NDArray[np.float32], n_neighbors=15, n_
     # Get number of clusters
     n_clusters = len(cluster_centers)
 
-    nbrs = NearestNeighbors(n_neighbors=n_neighbors, metric='euclidean')
+    nbrs = NearestNeighbors(n_neighbors=n_neighbors, metric="euclidean")
     nbrs.fit(cluster_centers)
     distances, indices = nbrs.kneighbors(cluster_centers)
 
@@ -48,7 +50,7 @@ def derive_cluster_hues(cluster_centers: NDArray[np.float32], n_neighbors=15, n_
     sigma = np.median(distances[:, 1])  # Use median distance to first neighbor
     for i in range(n_clusters):
         dists = np.linalg.norm(cluster_centers - cluster_centers[i], axis=1)
-        similarities[i] = np.exp(-dists**2 / (2 * sigma**2))
+        similarities[i] = np.exp(-(dists**2) / (2 * sigma**2))
 
     # Center the similarity matrix
     n = len(similarities)
@@ -60,10 +62,13 @@ def derive_cluster_hues(cluster_centers: NDArray[np.float32], n_neighbors=15, n_
     hue_values = eigenvectors[:, -1]
 
     # Normalize to [0,1] range, then multiply by n_cycles
-    hue_values = (hue_values - np.min(hue_values)) / (np.max(hue_values) - np.min(hue_values))
+    hue_values = (hue_values - np.min(hue_values)) / (
+        np.max(hue_values) - np.min(hue_values)
+    )
     hue_values = (hue_values * n_cycles) % 1.0
 
     return hue_values
+
 
 def interpolate_point_hue(
     point: NDArray[np.float32],
@@ -95,15 +100,12 @@ def interpolate_point_hue(
 
     for i in range(1, n_neighbors):
         diff = wrapped_hues[i] - center_hue
-        possible_diffs = [
-            diff,
-            diff + 1/n_cycles,
-            diff - 1/n_cycles
-        ]
+        possible_diffs = [diff, diff + 1 / n_cycles, diff - 1 / n_cycles]
         best_diff = possible_diffs[np.argmin(np.abs(possible_diffs))]
         wrapped_hues[i] = center_hue + best_diff
 
     return (np.sum(wrapped_hues * weights)) % 1.0
+
 
 def process_chunk(
     chunk_data: tuple[int, NDArray[np.float32], NDArray[np.float32]],
@@ -125,7 +127,7 @@ def process_chunk(
             cluster_centers=cluster_centers,
             cluster_hues=cluster_hues,
             n_cycles=n_cycles,
-            n_neighbors=n_neighbors
+            n_neighbors=n_neighbors,
         )
 
         rgb = hsluv_to_rgb((hue * 360, saturation, node_mass[i]))
@@ -134,11 +136,12 @@ def process_chunk(
 
     return start_idx, chunk_colors
 
+
 def main():
-    dim = int(os.environ['DIM'])
-    n_neighbors = int(os.environ['N_NEIGHBORS'])
-    n_clusters = int(os.environ['N_CLUSTERS'])
-    n_threads = int(os.environ['N_THREADS'])
+    dim = int(os.environ["DIM"])
+    n_neighbors = int(os.environ["N_NEIGHBORS"])
+    n_clusters = int(os.environ["N_CLUSTERS"])
+    n_threads = int(os.environ["N_THREADS"])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -154,24 +157,29 @@ def main():
     high_embeddings: NDArray[np.float32] = np.load(high_embeddings_path)
     print("loaded high_embeddings", high_embeddings_path, high_embeddings.shape)
 
-    cluster_centers_path = os.path.join(directory, f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy")
+    cluster_centers_path = os.path.join(
+        directory, f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy"
+    )
     cluster_centers: NDArray[np.float32] = np.load(cluster_centers_path)
     print("loaded cluster_centers", cluster_centers_path, cluster_centers.shape)
 
-    log_degrees = np.log1p(incoming_degrees) / np.log(10)  # log10(1+x) to handle zeros gracefully
+    log_degrees = np.log1p(incoming_degrees) / np.log(
+        10
+    )  # log10(1+x) to handle zeros gracefully
     # Normalize to [0,1] range
     log_degrees_norm = log_degrees / np.max(log_degrees)
     # Scale to desired lightness range (e.g., 40-90)
     min_lightness = 40
     max_lightness = 90
-    node_mass: NDArray[np.float32] = min_lightness + (max_lightness - min_lightness) * log_degrees_norm
+    node_mass: NDArray[np.float32] = (
+        min_lightness + (max_lightness - min_lightness) * log_degrees_norm
+    )
 
     n_cycles = 5
     n_neighbors = 3
 
     cluster_hues = derive_cluster_hues(
-        cluster_centers=cluster_centers,
-        n_cycles=n_cycles
+        cluster_centers=cluster_centers, n_cycles=n_cycles
     )
 
     # Determine number of processes and chunk size
@@ -191,7 +199,7 @@ def main():
         cluster_centers=cluster_centers,
         cluster_hues=cluster_hues,
         n_cycles=n_cycles,
-        n_neighbors=n_neighbors
+        n_neighbors=n_neighbors,
     )
 
     # Create the final array to store results
@@ -199,13 +207,16 @@ def main():
 
     # Process chunks in parallel
     with Pool(processes=n_threads) as pool:
-        for chunk_num, (start_idx, chunk_colors) in enumerate(pool.imap_unordered(process_chunk_partial, chunks)):
+        for chunk_num, (start_idx, chunk_colors) in enumerate(
+            pool.imap_unordered(process_chunk_partial, chunks)
+        ):
             end_idx = min(start_idx + len(chunk_colors), n_samples)
             colors[start_idx:end_idx] = chunk_colors
 
     colors_path = os.path.join(directory, "colors.buffer")
     print(f"Writing {colors_path}")
     colors.tofile(colors_path)
+
 
 if __name__ == "__main__":
     main()

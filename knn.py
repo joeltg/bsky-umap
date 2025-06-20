@@ -1,18 +1,18 @@
-import sys
 import os
+import sys
 
 import numpy as np
+from dotenv import load_dotenv
 from numpy.typing import NDArray
 from umap.umap_ import nearest_neighbors
 
-from dotenv import load_dotenv
-
 load_dotenv()
 
+
 def main():
-    n_neighbors = int(os.environ['N_NEIGHBORS'])
-    dim = int(os.environ['DIM'])
-    n_threads = int(os.environ['N_THREADS'])
+    n_neighbors = int(os.environ["N_NEIGHBORS"])
+    dim = int(os.environ["DIM"])
+    n_threads = int(os.environ["N_THREADS"])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -44,6 +44,7 @@ def main():
     np.save(knn_indices_path, knn_indices)
     print("saving", knn_dists_path)
     np.save(knn_dists_path, knn_dists)
+
 
 if __name__ == "__main__":
     main()
