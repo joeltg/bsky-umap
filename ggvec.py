@@ -271,7 +271,7 @@ def ggvec_main(
                     + "This is often due to too large learning rates."
                 )
                 print(err_str)
-                warnings.warn(err_str)
+                warnings.warn(err_str, stacklevel=1)
                 break
         elif not np.isfinite(loss).all():
             raise ValueError(
@@ -284,5 +284,6 @@ def ggvec_main(
             latest_loss.append(loss)
             latest_loss = latest_loss[1:]
             epoch_range.set_description(f"Loss: {loss:.4f}\t")
-    warnings.warn(f"GVec has not converged. Losses : {latest_loss}")
+
+    warnings.warn(f"GVec has not converged. Losses : {latest_loss}", stacklevel=1)
     return w

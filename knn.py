@@ -25,7 +25,7 @@ def main():
 
     high_embeddings: NDArray[np.float32] = np.load(high_embeddings_path)
 
-    print("loaded embeddings", high_embeddings.shape)
+    print(f"loaded embeddings {high_embeddings.shape} [{high_embeddings.dtype}]")
 
     knn_search_index = NNDescent(
         data=high_embeddings,
@@ -43,10 +43,10 @@ def main():
     knn_indices, knn_dists = knn_search_index.neighbor_graph
     print("finished nearest neighbors descent!")
 
-    print("saving", knn_indices_path)
+    print(f"saving {knn_indices_path}")
     np.save(knn_indices_path, knn_indices)
 
-    print("saving", knn_dists_path)
+    print(f"saving {knn_dists_path}")
     np.save(knn_dists_path, knn_dists)
 
 

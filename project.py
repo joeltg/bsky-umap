@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import cast
 
 import numpy as np
 from dotenv import load_dotenv
@@ -39,15 +40,15 @@ def main():
         verbose=True,
     )
 
-    # (low_embeddings, graph, sigmas, rhos) = umap.fit_transform(high_embeddings)
-    low_embeddings = umap.fit_transform(high_embeddings)
+    low_embeddings = cast(NDArray[np.float32], umap.fit_transform(high_embeddings))
 
-    print("low_embeddings has shape", low_embeddings.shape)
+    print(f"low_embeddings has shape {low_embeddings.shape} [{low_embeddings.dtype}]")
 
     low_embeddings_path = os.path.join(
         directory, f"low_embeddings-{dim}-{n_neighbors}.npy"
     )
-    print("saving", low_embeddings_path)
+
+    print(f"saving {low_embeddings_path}")
     np.save(low_embeddings_path, low_embeddings)
 
     # knn_edges_path = os.path.join(directory, f"knn_edges-{dim}-{n_neighbors}.arrow")
