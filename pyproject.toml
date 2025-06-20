@@ -9,6 +9,7 @@ dependencies = [
     "numba>=0.61.2",
     "numpy>=1.26.4",
     "pyarrow==19.0.0",
+    "pynndescent>=0.5.13",
     "python-dotenv==1.0.1",
     "scikit-learn>=1.6.1",
     "tqdm>=4.67.1",

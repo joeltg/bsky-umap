@@ -4,7 +4,7 @@ import sys
 import numpy as np
 from dotenv import load_dotenv
 from numpy.typing import NDArray
-from umap.umap_ import nearest_neighbors
+from pynndescent import NNDescent
 
 load_dotenv()
 
@@ -27,21 +27,25 @@ def main():
 
     print("loaded embeddings", high_embeddings.shape)
 
-    knn = nearest_neighbors(
-        high_embeddings,
+    knn_search_index = NNDescent(
+        data=high_embeddings,
         n_neighbors=n_neighbors,
         metric="cosine",
         metric_kwds=None,
-        angular=True,
         random_state=None,
-        verbose=True,
+        low_memory=True,
         n_jobs=n_threads,
+        verbose=True,
+        compressed=False,
     )
+
+    assert knn_search_index.neighbor_graph is not None
+    knn_indices, knn_dists = knn_search_index.neighbor_graph
     print("finished nearest neighbors descent!")
-    (knn_indices, knn_dists, rp_forest) = knn
 
     print("saving", knn_indices_path)
     np.save(knn_indices_path, knn_indices)
+
     print("saving", knn_dists_path)
     np.save(knn_dists_path, knn_dists)
 

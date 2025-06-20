@@ -31,11 +31,11 @@ def main():
     umap = UMAP(
         n_neighbors=n_neighbors,
         precomputed_knn=(knn_indices, knn_dists, None),
-        spread=4,
-        min_dist=0.5,
+        spread=1.5,
+        min_dist=0.2,
         n_epochs=n_epochs,
         n_jobs=n_threads,
-        metric="cosine",
+        metric="euclidean",
         verbose=True,
     )
 
