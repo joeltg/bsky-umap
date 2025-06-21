@@ -16,6 +16,8 @@ def main():
     n_neighbors = int(os.environ["N_NEIGHBORS"])
     n_epochs = int(os.environ["N_EPOCHS"])
     n_threads = int(os.environ["N_THREADS"])
+    spread = float(os.environ["SPREAD"])
+    min_dist = float(os.environ["MIN_DIST"])
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -33,8 +35,8 @@ def main():
     umap = UMAP(
         n_neighbors=n_neighbors,
         precomputed_knn=(knn_indices, knn_dists, None),
-        spread=1.5,
-        min_dist=0.2,
+        spread=spread,
+        min_dist=min_dist,
         n_epochs=n_epochs,
         n_jobs=n_threads,
         metric="euclidean",
