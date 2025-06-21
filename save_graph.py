@@ -34,7 +34,7 @@ def main():
         directory, f"low_embeddings-{dim}-{n_neighbors}.npy"
     )
     low_embeddings: NDArray[np.float32] = np.load(low_embeddings_path)
-    print("loaded low_embeddings", low_embeddings_path, low_embeddings.shape)
+    print("loaded low_embeddings", low_embeddings_path, low_embeddings.shape, low_embeddings.dtype)
 
     # knn_edges_path = os.path.join(directory, f"knn_edges-{dim}-{n_neighbors}.arrow")
     # (weights, sources, targets) = read_edges(knn_edges_path, ids)
