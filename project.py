@@ -5,6 +5,7 @@ from typing import cast
 import numpy as np
 from dotenv import load_dotenv
 from numpy.typing import NDArray
+
 from umap import UMAP
 
 load_dotenv()
@@ -37,6 +38,7 @@ def main():
         n_epochs=n_epochs,
         n_jobs=n_threads,
         metric="euclidean",
+        init="pca",
         verbose=True,
     )
 
