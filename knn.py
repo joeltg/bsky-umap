@@ -13,24 +13,29 @@ def main():
     n_neighbors = int(os.environ["N_NEIGHBORS"])
     dim = int(os.environ["DIM"])
     n_threads = int(os.environ["N_THREADS"])
+    metric = os.environ["METRIC"]
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
         raise Exception("missing data directory")
 
     directory = arguments[0]
-    high_embeddings_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
-    knn_indices_path = os.path.join(directory, f"knn_indices-{dim}-{n_neighbors}.npy")
-    knn_dists_path = os.path.join(directory, f"knn_dists-{dim}-{n_neighbors}.npy")
+    embeddings_path = os.path.join(directory, f"embeddings-{dim}.npy")
+    knn_indices_path = os.path.join(
+        directory, f"knn_indices-{dim}-{metric}-{n_neighbors}.npy"
+    )
+    knn_dists_path = os.path.join(
+        directory, f"knn_dists-{dim}-{metric}-{n_neighbors}.npy"
+    )
 
-    high_embeddings: NDArray[np.float32] = np.load(high_embeddings_path)
+    embeddings: NDArray[np.float32] = np.load(embeddings_path)
 
-    print(f"loaded embeddings {high_embeddings.shape} [{high_embeddings.dtype}]")
+    print(f"loaded embeddings {embeddings.shape} [{embeddings.dtype}]")
 
     knn_search_index = NNDescent(
-        data=high_embeddings,
+        data=embeddings,
         n_neighbors=n_neighbors,
-        metric="cosine",
+        metric=metric,
         metric_kwds=None,
         random_state=None,
         low_memory=True,

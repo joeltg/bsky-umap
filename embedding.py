@@ -52,7 +52,7 @@ def main():
         **ggvec_kwargs,
     )
 
-    embedding_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
+    embedding_path = os.path.join(directory, f"embeddings-{dim}.npy")
     print("saving", embedding_path)
     np.save(embedding_path, embeddings)
 

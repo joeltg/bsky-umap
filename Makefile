@@ -9,13 +9,17 @@ ifndef DIM
 $(error DIM is not set)
 endif
 
+ifndef METRIC
+$(error METRIC is not set)
+endif
+
 ifndef N_NEIGHBORS
 $(error N_NEIGHBORS is not set)
 endif
 
 all: colors umap
 init: $(DATA)/directory.sqlite $(DATA)/edges.arrow $(DATA)/nodes.arrow $(DATA)/ids.buffer
-embeddings: $(DATA)/high_embeddings-$(DIM).npy
+embeddings: $(DATA)/embeddings-$(DIM).npy
 colors: $(DATA)/colors.buffer
 umap: $(DATA)/positions.sqlite
 save: $(DATA)/positions.buffer $(DATA)/atlas.sqlite
@@ -34,25 +38,25 @@ $(DATA)/directory.sqlite: $(DATA)/graph.sqlite
 $(DATA)/edges.arrow $(DATA)/nodes.arrow $(DATA)/ids.buffer: $(DATA)/graph.sqlite
 	python sqlite_to_arrow.py $(DATA)
 
-$(DATA)/high_embeddings-$(DIM).npy: $(DATA)/nodes.arrow $(DATA)/edges.arrow
+$(DATA)/embeddings-$(DIM).npy: $(DATA)/nodes.arrow $(DATA)/edges.arrow
 	python embedding.py $(DATA)
 
-$(DATA)/knn_indices-$(DIM)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(N_NEIGHBORS).npy: $(DATA)/high_embeddings-$(DIM).npy
+$(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: $(DATA)/embeddings-$(DIM).npy
 	python knn.py $(DATA)
 
-$(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy: $(DATA)/high_embeddings-$(DIM).npy $(DATA)/knn_indices-$(DIM)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(N_NEIGHBORS).npy
+$(DATA)/positions-$(DIM)-$(N_NEIGHBORS).npy: $(DATA)/embeddings-$(DIM).npy $(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
 	python project.py $(DATA)
 
-$(DATA)/positions.buffer: $(DATA)/positions.sqlite $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy
+$(DATA)/positions.buffer: $(DATA)/positions.sqlite $(DATA)/positions-$(DIM)-$(N_NEIGHBORS).npy
 	python anneal.py $(DATA)
 
-$(DATA)/positions.sqlite: $(DATA)/low_embeddings-$(DIM)-$(N_NEIGHBORS).npy
+$(DATA)/positions.sqlite: $(DATA)/positions-$(DIM)-$(N_NEIGHBORS).npy
 	python save_graph.py $(DATA)
 
-$(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy: $(DATA)/high_embeddings-$(DIM).npy
+$(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy: $(DATA)/embeddings-$(DIM).npy
 	python labels.py $(DATA)
 
-$(DATA)/colors.buffer: $(DATA)/nodes.arrow $(DATA)/high_embeddings-$(DIM).npy $(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy
+$(DATA)/colors.buffer: $(DATA)/nodes.arrow $(DATA)/embeddings-$(DIM).npy $(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy
 	python colors.py $(DATA)
 
 $(DATA)/atlas.sqlite: $(DATA)/positions.sqlite

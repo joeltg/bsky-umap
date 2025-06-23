@@ -153,9 +153,9 @@ def main():
     with NodeReader(nodes_path) as reader:
         (ids, incoming_degrees) = reader.get_nodes()
 
-    high_embeddings_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
-    high_embeddings: NDArray[np.float32] = np.load(high_embeddings_path)
-    print("loaded high_embeddings", high_embeddings_path, high_embeddings.shape)
+    embeddings_path = os.path.join(directory, f"embeddings-{dim}.npy")
+    embeddings: NDArray[np.float32] = np.load(embeddings_path)
+    print("loaded embeddings", embeddings_path, embeddings.shape)
 
     cluster_centers_path = os.path.join(
         directory, f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy"
@@ -183,7 +183,7 @@ def main():
     )
 
     # Determine number of processes and chunk size
-    n_samples = len(high_embeddings)
+    n_samples = len(embeddings)
     chunk_size = n_samples // (n_threads * 4)
     print(f"Using {n_threads} processes with chunk size of {chunk_size}")
 
@@ -191,7 +191,7 @@ def main():
     chunks: list[tuple[int, NDArray[np.float32], NDArray[np.float32]]] = []
     for i in range(0, n_samples, chunk_size):
         end_idx = min(i + chunk_size, n_samples)
-        chunks.append((i, high_embeddings[i:end_idx], node_mass[i:end_idx]))
+        chunks.append((i, embeddings[i:end_idx], node_mass[i:end_idx]))
 
     # Prepare the partial function with fixed arguments
     process_chunk_partial = partial(

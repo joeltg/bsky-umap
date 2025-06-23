@@ -61,7 +61,7 @@ class ArrowReader:
         self.mmap_file = pa.memory_map(self.file_path, "r")
         self.reader = pa.ipc.RecordBatchFileReader(self.mmap_file)
         if self.schema is None:
-            self.reader.schema
+            self.schema = self.reader.schema
         else:
             assert self.schema.equals(self.reader.schema)
         return self

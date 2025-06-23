@@ -20,14 +20,14 @@ def main():
 
     directory = arguments[0]
 
-    high_embeddings_path = os.path.join(directory, f"high_embeddings-{dim}.npy")
-    high_embeddings: NDArray[np.float32] = np.load(high_embeddings_path)
+    embeddings_path = os.path.join(directory, f"embeddings-{dim}.npy")
+    embeddings: NDArray[np.float32] = np.load(embeddings_path)
 
-    print("high_embeddings", high_embeddings.shape)
+    print("embeddings", embeddings.shape)
 
     print("Performing k-means clustering")
     clusterer = KMeans(n_clusters=n_clusters, verbose=1, algorithm="elkan").fit(
-        high_embeddings
+        embeddings
     )
     print("k-means clustering completed.")
 
