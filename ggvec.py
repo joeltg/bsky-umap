@@ -44,7 +44,7 @@ def _fast_random_pair(nnodes, state):
 
 @jit(nopython=True, nogil=True, fastmath=True, parallel=True)
 def _ggvec_edges_update_batched(
-    src, dst, data, w, b, learning_rate=0.01, exponent=0.5, max_loss=10.0
+    src, dst, data, w, b, learning_rate=0.01, exponent=0.5, max_loss=10.0, batch_size=64
 ):
     """
     Batched edge updates with SIMD dot products and fused operations.
@@ -62,9 +62,10 @@ def _ggvec_edges_update_batched(
     Implementation inspired from https://github.com/maciejkula/glove-python/blob/master/glove/glove_cython.pyx
     """
     n_edges = dst.size
-    scale_factor = np.sqrt(np.float32(w.shape[0]))
+    # scale_factor = np.sqrt(w.shape[0])
+    scale_factor = np.sqrt(np.float32(w.shape[1]))
     inv_scale_factor = np.float32(1.0) / scale_factor
-    batch_size = 64
+
     n_batches = (n_edges + batch_size - 1) // batch_size
 
     total_loss = np.float32(0.0)
@@ -114,14 +115,16 @@ def _ggvec_edges_update_batched(
 
 
 @jit(nopython=True, nogil=True, fastmath=True, parallel=True)
-def _ggvec_reverse_batched(n_edges, w, b, learning_rate=0.01, max_loss=10.0):
+def _ggvec_reverse_batched(
+    n_edges, w, b, learning_rate=0.01, max_loss=10.0, batch_size=64
+):
     """
     Negative sampling with fast RNG and batched updates
     """
     nnodes = w.shape[0]
-    scale_factor = np.sqrt(np.float32(w.shape[0]))
+    # scale_factor = np.sqrt(w.shape[0])
+    scale_factor = np.sqrt(np.float32(w.shape[1]))
     inv_scale_factor = np.float32(1.0) / scale_factor
-    batch_size = 64
     n_batches = (n_edges + batch_size - 1) // batch_size
 
     # Parallelize over batches
@@ -179,6 +182,8 @@ def ggvec_main(
     exponent=0.5,
     max_loss=30.0,
     max_epoch=500,
+    batch_size=64,
+    n_threads=None,
 ):
     """
     GGVec: Fast global first (and higher) order local embeddings.
@@ -224,66 +229,90 @@ def ggvec_main(
         Optimization learning rate.
     max_loss : float
         Loss value ceiling for numerical stability.
+    batch_size : int
+        Batch size for positive and negative sampling
+    n_threads : int, optional
+        Maximum number of threads to use for parallel computation.
+        If None, uses all available threads. Thread count is restored
+        to original value after completion.
     """
-    # Ensure inputs are float32
-    data = data.astype(np.float32)
+    # Store original thread count and set new one if specified
+    original_threads = numba.get_num_threads()
+    if n_threads is not None:
+        numba.set_num_threads(min(original_threads, n_threads))
 
-    nnodes = n_nodes
-    w = np.random.rand(nnodes, n_components).astype(np.float32) - np.float32(0.5)
-    b = np.zeros(nnodes, dtype=np.float32)
+    try:
+        # Ensure inputs are float32
+        data = data.astype(np.float32)
 
-    latest_loss = [np.float32(np.inf)] * tol_samples
+        nnodes = n_nodes
+        w = np.random.rand(nnodes, n_components).astype(np.float32) - np.float32(0.5)
+        b = np.zeros(nnodes, dtype=np.float32)
 
-    epoch_range = tqdm.trange(0, max_epoch)
+        latest_loss = [np.float32(np.inf)] * tol_samples
+        loss = np.float32(np.inf)
 
-    for epoch in epoch_range:
-        # Relaxation pass
-        # Number of negative edges
-        neg_edges = int(dst.size * negative_ratio * ((1 - negative_decay) ** epoch))
-        _ggvec_reverse_batched(
-            neg_edges, w, b, learning_rate=learning_rate, max_loss=max_loss
-        )
+        epoch_range = tqdm.trange(0, max_epoch)
 
-        # Positive "contraction" pass
-        loss = _ggvec_edges_update_batched(
-            src,
-            dst,
-            data,
-            w,
-            b,
-            learning_rate=learning_rate,
-            exponent=exponent,
-            max_loss=max_loss,
-        )
-
-        # Pct Change in loss
-        max_latest = np.max(latest_loss)
-        min_latest = np.min(latest_loss)
-        if (epoch > tol_samples) and (
-            np.abs((max_latest - min_latest) / max_latest) < tol
-        ):
-            if loss < max_loss:
-                print(f"Converged! Loss: {loss:.4f}")
-                return w
-            else:
-                err_str = (
-                    f"Could not learn: loss {loss} = max loss {max_loss}\n"
-                    + "This is often due to too large learning rates."
-                )
-                print(err_str)
-                warnings.warn(err_str, stacklevel=1)
-                break
-        elif not np.isfinite(loss).all():
-            raise ValueError(
-                f"non finite loss: {latest_loss} on epoch {epoch}\n"
-                + f"Losses: {loss}\n"
-                + f"Previous losses: {[x for x in latest_loss if np.isfinite(x)]}"
-                + f"Try reducing the learning rate"
+        for epoch in epoch_range:
+            # Relaxation pass
+            # Number of negative edges
+            neg_edges = int(dst.size * negative_ratio * ((1 - negative_decay) ** epoch))
+            _ggvec_reverse_batched(
+                neg_edges,
+                w,
+                b,
+                learning_rate=learning_rate,
+                max_loss=max_loss,
+                batch_size=batch_size,
             )
-        else:
-            latest_loss.append(loss)
-            latest_loss = latest_loss[1:]
-            epoch_range.set_description(f"Loss: {loss:.4f}\t")
 
-    warnings.warn(f"GVec has not converged. Losses : {latest_loss}", stacklevel=1)
-    return w
+            # Positive "contraction" pass
+            loss = _ggvec_edges_update_batched(
+                src,
+                dst,
+                data,
+                w,
+                b,
+                learning_rate=learning_rate,
+                exponent=exponent,
+                max_loss=max_loss,
+                batch_size=batch_size,
+            )
+
+            # Pct Change in loss
+            max_latest = np.max(latest_loss)
+            min_latest = np.min(latest_loss)
+            if (epoch > tol_samples) and (
+                np.abs((max_latest - min_latest) / max_latest) < tol
+            ):
+                if loss < max_loss:
+                    print(f"[Loss: {loss:.4f}]: Converged!")
+                    return w
+                else:
+                    err_str = (
+                        f"Could not learn: loss {loss} = max loss {max_loss}\n"
+                        + "This is often due to too large learning rates."
+                    )
+                    print(err_str)
+                    warnings.warn(err_str, stacklevel=1)
+                    break
+            elif not np.isfinite(loss).all():
+                raise ValueError(
+                    f"non finite loss: {latest_loss} on epoch {epoch}\n"
+                    + f"Losses: {loss}\n"
+                    + f"Previous losses: {[x for x in latest_loss if np.isfinite(x)]}"
+                    + f"Try reducing the learning rate"
+                )
+            else:
+                latest_loss.append(loss)
+                latest_loss = latest_loss[1:]
+                epoch_range.set_description(f"[Loss: {loss:.4f}]")
+
+        warnings.warn(f"GVec has not converged. Loss: {loss:.4f}", stacklevel=1)
+        return w
+
+    finally:
+        # Always restore original thread count
+        if n_threads is not None:
+            numba.set_num_threads(original_threads)

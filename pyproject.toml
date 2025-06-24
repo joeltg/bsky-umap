@@ -13,7 +13,6 @@ dependencies = [
     "python-dotenv==1.0.1",
     "scikit-learn>=1.6.1",
     "tqdm>=4.67.1",
-    "umap-learn>=0.5.7",
 ]
 
 [tool.ruff]

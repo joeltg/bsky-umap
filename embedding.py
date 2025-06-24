@@ -24,6 +24,9 @@ def main():
     if "MAX_LOSS" in os.environ:
         ggvec_kwargs["max_loss"] = float(os.environ["MAX_LOSS"])
 
+    if "N_THREADS" in os.environ:
+        ggvec_kwargs["n_threads"] = int(os.environ["N_THREADS"])
+
     arguments = sys.argv[1:]
     if len(arguments) == 0:
         raise Exception("missing data directory")

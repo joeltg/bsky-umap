@@ -45,7 +45,7 @@ $(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)
 	python knn.py $(DATA)
 
 $(DATA)/positions-$(DIM)-$(N_NEIGHBORS).npy: $(DATA)/embeddings-$(DIM).npy $(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
-	python project.py $(DATA)
+	PYTHONPATH=umap-learn python project.py $(DATA)
 
 $(DATA)/positions.buffer: $(DATA)/positions.sqlite $(DATA)/positions-$(DIM)-$(N_NEIGHBORS).npy
 	python anneal.py $(DATA)
