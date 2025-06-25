@@ -1,10 +1,11 @@
-.venv
-.zed
+venv
 data
 __pycache__
 .DS_Store
 .env
 .ropeproject
+.ruff_cache
+
 keys/*.pem
 
 node_modules/
