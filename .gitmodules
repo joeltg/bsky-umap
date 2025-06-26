@@ -3,4 +3,4 @@
 	url = https://github.com/nDimensional/zig-rtree
 [submodule "umap-learn"]
 	path = umap-learn
-	url = https://github.com/lmcinnes/umap.git
+	url = https://github.com/joeltg/umap.git
