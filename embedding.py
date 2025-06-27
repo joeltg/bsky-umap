@@ -23,6 +23,8 @@ def main():
         ggvec_kwargs["negative_decay"] = float(os.environ["NEGATIVE_DECAY"])
     if "MAX_LOSS" in os.environ:
         ggvec_kwargs["max_loss"] = float(os.environ["MAX_LOSS"])
+    if "MAX_EPOCH" in os.environ:
+        ggvec_kwargs["max_epoch"] = int(os.environ["MAX_EPOCH"])
 
     if "N_THREADS" in os.environ:
         ggvec_kwargs["n_threads"] = int(os.environ["N_THREADS"])
