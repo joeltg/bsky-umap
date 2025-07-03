@@ -9,6 +9,7 @@ const File = @import("File.zig");
 var config = struct {
     path: []const u8 = "",
     capacity: u32 = 80 * 4096, // max 2.6 MB positions, 1.3 MB colors
+    dry_run: bool = false,
 }{};
 
 pub fn main() !void {
@@ -25,6 +26,12 @@ pub fn main() !void {
             .long_name = "capacity",
             .short_alias = 'c',
             .help = "Maximumm capacity of each tile",
+            .value_ref = r.mkRef(&config.capacity),
+        },
+        .{
+            .long_name = "dry-run",
+            .short_alias = 'c',
+            .help = "Skip writing node and atlas files",
             .value_ref = r.mkRef(&config.capacity),
         },
     };
@@ -189,14 +196,19 @@ const TileWalker = struct {
             const y: f32 = @bitCast(std.mem.readInt(u32, self.positions.data[i * 8 ..][4..8], .little));
             const position = @Vector(2, f32){ x, y };
 
-            if (area.contains(position)) {
+            if (!area.contains(position)) {
+                continue;
+            }
+
+            if (!config.dry_run) {
                 try self.tile_nodes.appendSlice(self.positions.data[i * 8 ..][0..8]);
                 try self.tile_nodes.appendSlice(self.colors.data[i * 4 ..][0..4]);
                 try self.atlas.insert(.{ .id = id, .position = position });
-                count += 1;
-                if (count >= config.capacity) {
-                    break;
-                }
+            }
+
+            count += 1;
+            if (count >= config.capacity) {
+                break;
             }
         }
 
@@ -221,7 +233,8 @@ const TileWalker = struct {
         try stream.write(@as(i48, @intFromFloat(area.s)));
         try stream.endObject();
 
-        { // write nodes
+        // write nodes
+        if (!config.dry_run) {
             try stream.objectField("nodes");
             const result = try self.writeFile("nodes", self.tile_nodes.items);
             try result.write(stream);
@@ -256,9 +269,10 @@ const TileWalker = struct {
                 std.debug.assert(self.tile_path.pop() == '3');
             } else try stream.write(null);
         } else {
-            const len = self.atlas.tree.items.len * @sizeOf(Atlas.Node);
-            const ptr: [*]const u8 = @ptrCast(self.atlas.tree.items.ptr);
-            { // write atlas
+            // write atlas
+            if (!config.dry_run) {
+                const len = self.atlas.tree.items.len * @sizeOf(Atlas.Node);
+                const ptr: [*]const u8 = @ptrCast(self.atlas.tree.items.ptr);
                 try stream.objectField("atlas");
                 const result = try self.writeFile("atlas", ptr[0..len]);
                 try result.write(stream);
@@ -272,14 +286,8 @@ const TileWalker = struct {
         filename: []const u8,
         size: usize,
 
-        pub fn write(self: WriteFileResult, stream: *JsonStream) !void {
+        pub inline fn write(self: WriteFileResult, stream: *JsonStream) !void {
             try stream.write(self.filename);
-            // try stream.beginObject();
-            // try stream.objectField("filename");
-            // try stream.write(self.filename);
-            // try stream.objectField("size");
-            // try stream.write(self.size);
-            // try stream.endObject();
         }
     };
 
