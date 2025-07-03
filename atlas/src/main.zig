@@ -30,9 +30,8 @@ pub fn main() !void {
         },
         .{
             .long_name = "dry-run",
-            .short_alias = 'c',
             .help = "Skip writing node and atlas files",
-            .value_ref = r.mkRef(&config.capacity),
+            .value_ref = r.mkRef(&config.dry_run),
         },
     };
 
