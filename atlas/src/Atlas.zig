@@ -147,21 +147,25 @@ pub const Error = std.mem.Allocator.Error || error{ Empty, OutOfBounds };
 
 area: Area,
 tree: std.ArrayList(Node),
+count: std.ArrayList(usize),
 
 pub fn init(allocator: std.mem.Allocator, area: Area) Atlas {
     return .{
-        .tree = std.ArrayList(Node).init(allocator),
         .area = area,
+        .tree = std.ArrayList(Node).init(allocator),
+        .count = std.ArrayList(usize).init(allocator),
     };
 }
 
 pub fn deinit(self: Atlas) void {
     self.tree.deinit();
+    self.count.deinit();
 }
 
 pub fn reset(self: *Atlas, area: Area) void {
     self.area = area;
     self.tree.clearRetainingCapacity();
+    self.count.clearRetainingCapacity();
 }
 
 pub fn insert(self: *Atlas, body: Body) !void {
@@ -169,7 +173,7 @@ pub fn insert(self: *Atlas, body: Body) !void {
         return Error.OutOfBounds;
 
     if (self.tree.items.len == 0) {
-        try self.tree.append(Node.create(body));
+        _ = try self.append(Node.create(body));
     } else {
         try self.insertNode(0, self.area, body);
     }
@@ -187,12 +191,12 @@ fn insertNode(self: *Atlas, idx: u24, area: Area, body: Body) !void {
         if (@reduce(.And, node_position == body.position))
             return error.Collision;
 
-        const child_idx: u24 = @intCast(self.tree.items.len);
-        try self.tree.append(node);
-
+        const child_idx = try self.append(node);
         self.tree.items[idx].clear();
         self.tree.items[idx].setQuadrant(node_quadrant, child_idx);
     }
+
+    self.count.items[idx] += 1;
 
     const body_quadrant = area.locate(body.position);
     const child = self.tree.items[idx].getQuadrant(body_quadrant);
@@ -200,10 +204,16 @@ fn insertNode(self: *Atlas, idx: u24, area: Area, body: Body) !void {
     if (child != 0) {
         try self.insertNode(child, area.divide(body_quadrant), body);
     } else {
-        const index: u24 = @intCast(self.tree.items.len);
-        try self.tree.append(Node.create(body));
+        const index = try self.append(Node.create(body));
         self.tree.items[idx].setQuadrant(body_quadrant, index);
     }
+}
+
+inline fn append(self: *Atlas, node: Node) !u24 {
+    const index: u24 = @intCast(self.tree.items.len);
+    try self.tree.append(node);
+    try self.count.append(1);
+    return index;
 }
 
 pub const NearestBodyMode = enum(u2) { inclusive, exclusive };

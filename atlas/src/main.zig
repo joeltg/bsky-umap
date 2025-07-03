@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const cli = @import("zig-cli");
-const quadtree = @import("quadtree");
+const quadtree = @import("Quadtree.zig");
 
 const Atlas = @import("Atlas.zig");
 const File = @import("File.zig");
@@ -144,7 +144,7 @@ const TileWalker = struct {
             .atlas = Atlas.init(allocator, .{}),
             .tile_dir = tile_dir,
             .tile_path = std.ArrayList(u8).init(allocator),
-            .tree = quadtree.Quadtree.init(std.heap.c_allocator, area, .{}),
+            .tree = quadtree.Quadtree.init(std.heap.c_allocator, area),
             .tile_nodes = std.ArrayList(u8).init(allocator),
         };
     }
@@ -182,7 +182,7 @@ const TileWalker = struct {
         const area = self.tree.area;
 
         if (config.list) {
-            try self.addTileList(.{ .c = area.c, .s = area.s }, 0, index_file.writer());
+            try self.addTileList(area, 0, index_file.writer());
         } else {
             var stream = std.json.writeStream(index_file.writer(), .{ .whitespace = .indent_tab });
             defer stream.deinit();
@@ -196,35 +196,11 @@ const TileWalker = struct {
         rng.random().shuffle(u32, self.node_indices);
     }
 
-    fn addTileList(self: *TileWalker, area: Atlas.Area, idx: u32, out_stream: std.fs.File.Writer) !void {
+    fn addTileList(self: *TileWalker, area: quadtree.Area, idx: u32, out_stream: std.fs.File.Writer) !void {
         const node = self.tree.tree.items[idx];
         const total: u32 = @intFromFloat(@round(node.mass));
 
-        self.atlas.reset(area);
         self.tile_nodes.clearRetainingCapacity();
-
-        var count: u32 = 0;
-        for (self.node_indices) |i| {
-            const id = std.mem.readInt(u32, self.ids.data[i * 4 ..][0..4], .little);
-            const x: f32 = @bitCast(std.mem.readInt(u32, self.positions.data[i * 8 ..][0..4], .little));
-            const y: f32 = @bitCast(std.mem.readInt(u32, self.positions.data[i * 8 ..][4..8], .little));
-            const position = @Vector(2, f32){ x, y };
-
-            if (!area.contains(position)) {
-                continue;
-            }
-
-            if (!config.dry_run) {
-                try self.tile_nodes.appendSlice(self.positions.data[i * 8 ..][0..8]);
-                try self.tile_nodes.appendSlice(self.colors.data[i * 4 ..][0..4]);
-                try self.atlas.insert(.{ .id = id, .position = position });
-            }
-
-            count += 1;
-            if (count >= config.capacity) {
-                break;
-            }
-        }
 
         {
             var stream = std.json.writeStream(out_stream, .{ .whitespace = .minified });
@@ -240,8 +216,6 @@ const TileWalker = struct {
             try stream.write(self.tile_path.items.len);
             try stream.objectField("total");
             try stream.write(total);
-            try stream.objectField("count");
-            try stream.write(count);
 
             try stream.objectField("area");
             try stream.beginObject();
