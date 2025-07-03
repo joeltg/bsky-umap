@@ -166,7 +166,7 @@ const TileWalker = struct {
         std.log.info("inserted {d} points into quadtree", .{self.node_count});
 
         const index_file = switch (config.dry_run) {
-            true => try std.io.getStdOut(),
+            true => std.io.getStdOut(),
             false => try self.tile_dir.createFile("index.json", .{}),
         };
 
