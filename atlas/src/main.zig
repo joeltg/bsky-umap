@@ -10,6 +10,7 @@ var config = struct {
     path: []const u8 = "",
     capacity: u32 = 80 * 4096, // max 2.6 MB positions, 1.3 MB colors
     dry_run: bool = false,
+    list: bool = false,
 }{};
 
 pub fn main() !void {
@@ -32,6 +33,11 @@ pub fn main() !void {
             .long_name = "dry-run",
             .help = "Skip writing node and atlas files",
             .value_ref = r.mkRef(&config.dry_run),
+        },
+        .{
+            .long_name = "list",
+            .help = "Write tiles as JSONL stream",
+            .value_ref = r.mkRef(&config.list),
         },
     };
 
@@ -172,17 +178,138 @@ const TileWalker = struct {
 
         defer index_file.close();
 
-        var stream = std.json.writeStream(index_file.writer(), .{ .whitespace = .indent_tab });
-        defer stream.deinit();
-
         self.shuffle(1);
         const area = self.tree.area;
-        try self.addTile(.{ .c = area.c, .s = area.s }, 0, &stream);
+
+        if (config.list) {
+            try self.addTileList(.{ .c = area.c, .s = area.s }, 0, index_file.writer());
+        } else {
+            var stream = std.json.writeStream(index_file.writer(), .{ .whitespace = .indent_tab });
+            defer stream.deinit();
+
+            try self.addTile(.{ .c = area.c, .s = area.s }, 0, &stream);
+        }
     }
 
     inline fn shuffle(self: *TileWalker, seed: u64) void {
         var rng = std.Random.Xoshiro256.init(seed);
         rng.random().shuffle(u32, self.node_indices);
+    }
+
+    fn addTileList(self: *TileWalker, area: Atlas.Area, idx: u32, out_stream: std.fs.File.Writer) !void {
+        const node = self.tree.tree.items[idx];
+        const total: u32 = @intFromFloat(@round(node.mass));
+
+        self.atlas.reset(area);
+        self.tile_nodes.clearRetainingCapacity();
+
+        var count: u32 = 0;
+        for (self.node_indices) |i| {
+            const id = std.mem.readInt(u32, self.ids.data[i * 4 ..][0..4], .little);
+            const x: f32 = @bitCast(std.mem.readInt(u32, self.positions.data[i * 8 ..][0..4], .little));
+            const y: f32 = @bitCast(std.mem.readInt(u32, self.positions.data[i * 8 ..][4..8], .little));
+            const position = @Vector(2, f32){ x, y };
+
+            if (!area.contains(position)) {
+                continue;
+            }
+
+            if (!config.dry_run) {
+                try self.tile_nodes.appendSlice(self.positions.data[i * 8 ..][0..8]);
+                try self.tile_nodes.appendSlice(self.colors.data[i * 4 ..][0..4]);
+                try self.atlas.insert(.{ .id = id, .position = position });
+            }
+
+            count += 1;
+            if (count >= config.capacity) {
+                break;
+            }
+        }
+
+        {
+            var stream = std.json.writeStream(out_stream, .{ .whitespace = .minified });
+            defer stream.deinit();
+
+            try stream.beginObject();
+
+            try stream.objectField("index");
+            try stream.write(idx);
+            try stream.objectField("id");
+            try stream.write(self.getId());
+            try stream.objectField("level");
+            try stream.write(self.tile_path.items.len);
+            try stream.objectField("total");
+            try stream.write(total);
+            try stream.objectField("count");
+            try stream.write(count);
+
+            try stream.objectField("area");
+            try stream.beginObject();
+            try stream.objectField("x");
+            try stream.write(@as(i48, @intFromFloat(area.c[0])));
+            try stream.objectField("y");
+            try stream.write(@as(i48, @intFromFloat(area.c[1])));
+            try stream.objectField("s");
+            try stream.write(@as(i48, @intFromFloat(area.s)));
+            try stream.endObject();
+
+            // write nodes
+            if (!config.dry_run) {
+                try stream.objectField("nodes");
+                const result = try self.writeFile("nodes", self.tile_nodes.items);
+                try result.write(&stream);
+            }
+
+            if (total > config.capacity) {
+                try stream.objectField("ne");
+                try stream.write(if (node.ne != quadtree.Node.NULL) node.ne else null);
+                try stream.objectField("nw");
+                try stream.write(if (node.nw != quadtree.Node.NULL) node.nw else null);
+                try stream.objectField("sw");
+                try stream.write(if (node.sw != quadtree.Node.NULL) node.sw else null);
+                try stream.objectField("se");
+                try stream.write(if (node.se != quadtree.Node.NULL) node.se else null);
+            } else {
+                // write atlas
+                if (!config.dry_run) {
+                    const len = self.atlas.tree.items.len * @sizeOf(Atlas.Node);
+                    const ptr: [*]const u8 = @ptrCast(self.atlas.tree.items.ptr);
+                    try stream.objectField("atlas");
+                    const result = try self.writeFile("atlas", ptr[0..len]);
+                    try result.write(&stream);
+                }
+            }
+
+            try stream.endObject();
+        }
+
+        try out_stream.writeByte('\n');
+
+        if (total > config.capacity) {
+            if (node.ne != quadtree.Node.NULL) {
+                try self.tile_path.append('0');
+                try self.addTileList(area.divide(.ne), node.ne, out_stream);
+                std.debug.assert(self.tile_path.pop() == '0');
+            }
+
+            if (node.nw != quadtree.Node.NULL) {
+                try self.tile_path.append('1');
+                try self.addTileList(area.divide(.nw), node.nw, out_stream);
+                std.debug.assert(self.tile_path.pop() == '1');
+            }
+
+            if (node.sw != quadtree.Node.NULL) {
+                try self.tile_path.append('2');
+                try self.addTileList(area.divide(.sw), node.sw, out_stream);
+                std.debug.assert(self.tile_path.pop() == '2');
+            }
+
+            if (node.se != quadtree.Node.NULL) {
+                try self.tile_path.append('3');
+                try self.addTileList(area.divide(.se), node.se, out_stream);
+                std.debug.assert(self.tile_path.pop() == '3');
+            }
+        }
     }
 
     fn addTile(self: *TileWalker, area: Atlas.Area, idx: u32, stream: *JsonStream) !void {
