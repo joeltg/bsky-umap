@@ -13,7 +13,18 @@ def main():
     n_neighbors = int(os.environ["N_NEIGHBORS"])
     dim = int(os.environ["DIM"])
     n_threads = int(os.environ["N_THREADS"])
-    metric = os.environ["METRIC"]
+
+    n_trees: None | int = None
+    if "N_TREES" in os.environ:
+        n_trees = int(os.environ["N_TREES"])
+
+    n_iters: None | int = None
+    if "N_ITERS" in os.environ:
+        n_iters = int(os.environ["N_ITERS"])
+
+    metric: str = "euclidean"
+    if "METRIC" in os.environ:
+        metric = os.environ["METRIC"]
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -40,8 +51,10 @@ def main():
         random_state=None,
         low_memory=True,
         n_jobs=n_threads,
-        verbose=True,
+        n_trees = n_trees,
+        n_iters=n_iters,
         compressed=False,
+        verbose=True,
     )
 
     assert knn_search_index.neighbor_graph is not None

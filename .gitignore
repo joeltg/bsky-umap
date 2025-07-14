@@ -1,12 +1,13 @@
-venv
 data
+keys/*.pem
+
 __pycache__
 .DS_Store
+.venv
 .env
 .ropeproject
 .ruff_cache
 
-keys/*.pem
 
 node_modules/
 **/.zig-cache/
