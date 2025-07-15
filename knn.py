@@ -61,9 +61,11 @@ def main():
     knn_indices, knn_dists = knn_search_index.neighbor_graph
     print("finished nearest neighbors descent!")
 
+    knn_indices = knn_indices.astype(np.int32)
     print(f"saving {knn_indices_path} {knn_indices.shape} [{knn_indices.dtype}]")
     np.save(knn_indices_path, knn_indices)
 
+    knn_dists = knn_dists.astype(np.float32)
     print(f"saving {knn_dists_path} {knn_dists.shape} [{knn_dists.dtype}]")
     np.save(knn_dists_path, knn_dists)
 
