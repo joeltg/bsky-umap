@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const cli = @import("zig-cli");
-const quadtree = @import("Quadtree.zig");
+const quadtree = @import("quadtree");
 
 const Atlas = @import("Atlas.zig");
 const File = @import("File.zig");
@@ -144,7 +144,7 @@ const TileWalker = struct {
             .atlas = Atlas.init(allocator, .{}),
             .tile_dir = tile_dir,
             .tile_path = std.ArrayList(u8).init(allocator),
-            .tree = quadtree.Quadtree.init(std.heap.c_allocator, area),
+            .tree = quadtree.Quadtree.init(std.heap.c_allocator, area, .{}),
             .tile_nodes = std.ArrayList(u8).init(allocator),
         };
     }
