@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from numpy.typing import NDArray
 from umap import UMAP
 
+from utils import load, save
+
 load_dotenv()
 
 
@@ -25,16 +27,13 @@ def main():
 
     directory = arguments[0]
 
-    embeddings_path = os.path.join(directory, f"embeddings-{dim}.npy")
-    embeddings: NDArray[np.float32] = np.load(embeddings_path)
-    knn_indices_path = os.path.join(
+    embeddings: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy")
+    knn_indices: NDArray[np.uint32] = load(
         directory, f"knn_indices-{dim}-{metric}-{n_neighbors}.npy"
     )
-    knn_indices: NDArray[np.uint32] = np.load(knn_indices_path)
-    knn_dists_path = os.path.join(
+    knn_dists: NDArray[np.float32] = load(
         directory, f"knn_dists-{dim}-{metric}-{n_neighbors}.npy"
     )
-    knn_dists: NDArray[np.float32] = np.load(knn_dists_path)
 
     umap = UMAP(
         n_neighbors=n_neighbors,
@@ -43,21 +42,13 @@ def main():
         min_dist=min_dist,
         n_epochs=n_epochs,
         n_jobs=n_threads,
-        # metric=metric,
+        metric=metric,
         init="pca",
         verbose=True,
     )
 
     positions = cast(NDArray[np.float32], umap.fit_transform(embeddings))
-
-    print(f"positions has shape {positions.shape} [{positions.dtype}]")
-
-    positions_path = os.path.join(
-        directory, f"positions-{dim}-{metric}-{n_neighbors}.npy"
-    )
-
-    print(f"saving {positions_path}")
-    np.save(positions_path, positions)
+    save(directory, f"positions-{dim}-{metric}-{n_neighbors}.npy", positions)
 
 
 if __name__ == "__main__":

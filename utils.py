@@ -1,6 +1,24 @@
+import os
+
 import numpy as np
 import pyarrow as pa
 from numpy.typing import NDArray
+
+
+def save(directory: str, filename: str, array: NDArray):
+    path = os.path.join(directory, filename)
+    print(f"saving {path} {array.shape} [{array.dtype}]")
+    np.save(path, array)
+
+
+def load(directory: str, filename: str) -> NDArray:
+    path = os.path.join(directory, filename)
+    array = np.load(path, mmap_mode="r")
+    print(f"loaded {path} {array.shape} [{array.dtype}]")
+    return array
+
+
+ipc_write_options = pa.ipc.IpcWriteOptions(allow_64bit=True)
 
 edge_schema = pa.schema(
     [
@@ -23,7 +41,9 @@ def write_edges(
     ]
 
     with pa.OSFile(path, "wb") as sink:
-        with pa.ipc.new_file(sink, schema=edge_schema) as writer:
+        with pa.ipc.new_file(
+            sink, schema=edge_schema, options=ipc_write_options
+        ) as writer:
             batch = pa.record_batch(data, schema=edge_schema)
             writer.write(batch)
 
@@ -45,7 +65,9 @@ def write_nodes(
     ]
 
     with pa.OSFile(path, "wb") as sink:
-        with pa.ipc.new_file(sink, schema=node_schema) as writer:
+        with pa.ipc.new_file(
+            sink, schema=node_schema, options=ipc_write_options
+        ) as writer:
             batch = pa.record_batch(data, schema=node_schema)
             writer.write(batch)
 

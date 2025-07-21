@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from numpy.typing import NDArray
 from pynndescent import NNDescent
 
+from utils import load, save
+
 load_dotenv()
 
 
@@ -31,17 +33,8 @@ def main():
         raise Exception("missing data directory")
 
     directory = arguments[0]
-    embeddings_path = os.path.join(directory, f"embeddings-{dim}.npy")
-    knn_indices_path = os.path.join(
-        directory, f"knn_indices-{dim}-{metric}-{n_neighbors}.npy"
-    )
-    knn_dists_path = os.path.join(
-        directory, f"knn_dists-{dim}-{metric}-{n_neighbors}.npy"
-    )
 
-    embeddings: NDArray[np.float32] = np.load(embeddings_path)
-
-    print(f"loaded embeddings {embeddings.shape} [{embeddings.dtype}]")
+    embeddings: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy")
 
     knn_search_index = NNDescent(
         data=embeddings,
@@ -51,7 +44,7 @@ def main():
         random_state=None,
         low_memory=True,
         n_jobs=n_threads,
-        n_trees = n_trees,
+        n_trees=n_trees,
         n_iters=n_iters,
         compressed=False,
         verbose=True,
@@ -61,13 +54,17 @@ def main():
     knn_indices, knn_dists = knn_search_index.neighbor_graph
     print("finished nearest neighbors descent!")
 
-    knn_indices = knn_indices.astype(np.int32)
-    print(f"saving {knn_indices_path} {knn_indices.shape} [{knn_indices.dtype}]")
-    np.save(knn_indices_path, knn_indices)
+    save(
+        directory,
+        f"knn_indices-{dim}-{metric}-{n_neighbors}.npy",
+        knn_indices.astype(np.int32),
+    )
 
-    knn_dists = knn_dists.astype(np.float32)
-    print(f"saving {knn_dists_path} {knn_dists.shape} [{knn_dists.dtype}]")
-    np.save(knn_dists_path, knn_dists)
+    save(
+        directory,
+        f"knn_dists-{dim}-{metric}-{n_neighbors}.npy",
+        knn_dists.astype(np.float32),
+    )
 
 
 if __name__ == "__main__":

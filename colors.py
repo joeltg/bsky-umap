@@ -9,7 +9,7 @@ from hsluv import hsluv_to_rgb
 from numpy.typing import NDArray
 from sklearn.neighbors import NearestNeighbors
 
-from utils import NodeReader
+from utils import NodeReader, load
 
 load_dotenv()
 
@@ -153,19 +153,13 @@ def main():
     with NodeReader(nodes_path) as reader:
         (ids, incoming_degrees) = reader.get_nodes()
 
-    embeddings_path = os.path.join(directory, f"embeddings-{dim}.npy")
-    embeddings: NDArray[np.float32] = np.load(embeddings_path)
-    print("loaded embeddings", embeddings_path, embeddings.shape)
-
-    cluster_centers_path = os.path.join(
+    embeddings: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy")
+    cluster_centers: NDArray[np.float32] = load(
         directory, f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy"
     )
-    cluster_centers: NDArray[np.float32] = np.load(cluster_centers_path)
-    print("loaded cluster_centers", cluster_centers_path, cluster_centers.shape)
 
-    log_degrees = np.log1p(incoming_degrees) / np.log(
-        10
-    )  # log10(1+x) to handle zeros gracefully
+    # log10(1+x) to handle zeros gracefully
+    log_degrees = np.log1p(incoming_degrees) / np.log(10)
     # Normalize to [0,1] range
     log_degrees_norm = log_degrees / np.max(log_degrees)
     # Scale to desired lightness range (e.g., 40-90)

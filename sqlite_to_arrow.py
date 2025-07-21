@@ -5,7 +5,7 @@ import sys
 import numpy as np
 from dotenv import load_dotenv
 
-from utils import write_edges, write_nodes
+from utils import save, write_edges, write_nodes
 
 load_dotenv()
 
@@ -34,6 +34,7 @@ def main():
         id_to_index: dict[int, int] = {}
 
         incoming_degrees = np.zeros(node_count, dtype=np.uint32)
+        outgoing_degrees = np.zeros(node_count, dtype=np.uint32)
 
         cursor.execute("SELECT id FROM nodes ORDER BY id")
         for i, (id,) in enumerate(cursor):
@@ -43,8 +44,6 @@ def main():
         edge_count = count(cursor, "edges")
         print(f"Number of edges: {edge_count}")
 
-        # Allocate weights
-        weights = np.ones(edge_count, dtype=np.float32)
         rows = np.zeros(edge_count, dtype=np.uint32)
         cols = np.zeros(edge_count, dtype=np.uint32)
 
@@ -55,6 +54,7 @@ def main():
             t = id_to_index[target]
             rows[i] = s
             cols[i] = t
+            outgoing_degrees[s] += 1
             incoming_degrees[t] += 1
 
             if i > 0 and i % 10000000 == 0:
@@ -63,6 +63,26 @@ def main():
 
     finally:
         conn.close()
+
+    save(directory, "sources.npy", rows)
+    save(directory, "targets.npy", cols)
+    save(directory, "incoming_degrees.npy", incoming_degrees)
+    save(directory, "outgoing_degrees.npy", outgoing_degrees)
+
+    print("normalizing edge weights...")
+    # w(u,v) = 2 * (
+    #   min(ln(d_out(u)+1), ln(d_in(v)+1)) / max(ln(d_out(u)+1), ln(d_in(v)+1))
+    # ) / ln((d_out(u)+1) * (d_in(v)+1))
+    w_outgoing = np.log(outgoing_degrees + 1, dtype=np.float32)
+    w_incoming = np.log(incoming_degrees + 1, dtype=np.float32)
+    w_outgoing_source = w_outgoing[rows]
+    w_incoming_target = w_incoming[cols]
+    scale = (w_outgoing_source + w_incoming_target) / 2.0
+    weights = (
+        np.minimum(w_outgoing_source, w_incoming_target)
+        / np.maximum(w_outgoing_source, w_incoming_target)
+    ) / scale
+    print("done!")
 
     nodes_path = os.path.join(directory, "nodes.arrow")
     write_nodes(nodes_path, ids, incoming_degrees)

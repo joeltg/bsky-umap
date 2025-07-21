@@ -1,11 +1,10 @@
 import os
 import sys
 
-import numpy as np
 from dotenv import load_dotenv
 
 from ggvec import ggvec_main
-from utils import EdgeReader, NodeReader
+from utils import EdgeReader, NodeReader, save
 
 load_dotenv()
 
@@ -57,9 +56,7 @@ def main():
         **ggvec_kwargs,
     )
 
-    embedding_path = os.path.join(directory, f"embeddings-{dim}.npy")
-    print("saving", embedding_path)
-    np.save(embedding_path, embeddings)
+    save(directory, f"embeddings-{dim}.npy", embeddings)
 
 
 if __name__ == "__main__":

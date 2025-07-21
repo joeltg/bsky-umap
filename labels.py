@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from numpy.typing import NDArray
 from sklearn.cluster import KMeans
 
+from utils import load, save
+
 load_dotenv()
 
 
@@ -20,10 +22,7 @@ def main():
 
     directory = arguments[0]
 
-    embeddings_path = os.path.join(directory, f"embeddings-{dim}.npy")
-    embeddings: NDArray[np.float32] = np.load(embeddings_path)
-
-    print("embeddings", embeddings.shape)
+    embeddings: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy")
 
     print("Performing k-means clustering")
     clusterer = KMeans(n_clusters=n_clusters, verbose=1, algorithm="elkan").fit(
@@ -38,15 +37,17 @@ def main():
     cluster_centers = clusterer.cluster_centers_
     print("cluster_centers", type(cluster_centers), cluster_centers.shape)
 
-    cluster_labels_path = os.path.join(
-        directory, f"cluster_labels-{dim}-{n_neighbors}-{n_clusters}.npy"
+    save(
+        directory,
+        f"cluster_labels-{dim}-{n_neighbors}-{n_clusters}.npy",
+        cluster_labels,
     )
-    np.save(cluster_labels_path, cluster_labels)
 
-    cluster_centers_path = os.path.join(
-        directory, f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy"
+    save(
+        directory,
+        f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy",
+        cluster_centers,
     )
-    np.save(cluster_centers_path, cluster_centers)
 
 
 if __name__ == "__main__":
