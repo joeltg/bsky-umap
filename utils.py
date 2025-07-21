@@ -52,16 +52,21 @@ node_schema = pa.schema(
     [
         pa.field("id", pa.uint32()),
         pa.field("incoming_degree", pa.uint32()),
+        pa.field("outgoing_degree", pa.uint32()),
     ]
 )
 
 
 def write_nodes(
-    path: str, ids: NDArray[np.uint32], incoming_degrees: NDArray[np.uint32]
+    path: str,
+    ids: NDArray[np.uint32],
+    incoming_degrees: NDArray[np.uint32],
+    outgoing_degrees: NDArray[np.uint32],
 ):
     data = [
         pa.array(ids, type=pa.uint32()),
         pa.array(incoming_degrees, type=pa.uint32()),
+        pa.array(outgoing_degrees, type=pa.uint32()),
     ]
 
     with pa.OSFile(path, "wb") as sink:
@@ -103,19 +108,22 @@ class NodeReader(ArrowReader):
     def __init__(self, file_path):
         super().__init__(file_path, node_schema)
 
-    def get_nodes(self, batch_index=0) -> tuple[NDArray[np.uint32], NDArray[np.uint32]]:
+    def get_nodes(
+        self, batch_index=0
+    ) -> tuple[NDArray[np.uint32], NDArray[np.uint32], NDArray[np.uint32]]:
         """Get node data as typed numpy arrays (zero-copy).
 
         Returns:
-            tuple: (ids, incoming_degrees)
+            tuple: (ids, incoming_degrees, outgoing_degrees )
         """
         columns = self.get_columns_as_numpy(batch_index)
-        if len(columns) != 2:
-            raise ValueError(f"Expected 2 columns for node data, got {len(columns)}")
+        if len(columns) != 3:
+            raise ValueError(f"Expected 3 columns for node data, got {len(columns)}")
 
         ids: NDArray[np.uint32] = columns[0]
         incoming_degrees: NDArray[np.uint32] = columns[1]
-        return (ids, incoming_degrees)
+        outgoing_degrees: NDArray[np.uint32] = columns[2]
+        return (ids, incoming_degrees, outgoing_degrees)
 
 
 class EdgeReader(ArrowReader):

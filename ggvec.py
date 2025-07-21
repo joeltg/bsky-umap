@@ -287,6 +287,7 @@ def ggvec_main(
                 np.abs((max_latest - min_latest) / max_latest) < tol
             ):
                 if loss < max_loss:
+                    epoch_range.close()
                     print(f"[Loss: {loss:.4f}]: Converged!")
                     return w
                 else:

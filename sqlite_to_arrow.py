@@ -3,6 +3,7 @@ import sqlite3
 import sys
 
 import numpy as np
+import tqdm
 from dotenv import load_dotenv
 
 from utils import save, write_edges, write_nodes
@@ -47,45 +48,66 @@ def main():
         rows = np.zeros(edge_count, dtype=np.uint32)
         cols = np.zeros(edge_count, dtype=np.uint32)
 
-        # Fill indices array
-        cursor.execute("SELECT source, target FROM edges")
-        for i, (source, target) in enumerate(cursor):
-            s = id_to_index[source]
-            t = id_to_index[target]
-            rows[i] = s
-            cols[i] = t
-            outgoing_degrees[s] += 1
-            incoming_degrees[t] += 1
+        chunk_size = 1_000_000
+        edge_rowid = 0
+        for start_idx in tqdm.trange(0, edge_count, chunk_size, desc="loading edges"):
+            cursor.execute(
+                "SELECT rowid, source, target FROM edges WHERE rowid > ? LIMIT ?",
+                (edge_rowid, chunk_size),
+            )
 
-            if i > 0 and i % 10000000 == 0:
-                progress = 100 * float(i / edge_count)
-                print(f"loaded {i} edges out of {edge_count} ({progress:.2f}%)")
+            for offset, (rowid, source, target) in enumerate(cursor):
+                i = start_idx + offset
+                s = id_to_index[source]
+                t = id_to_index[target]
+                rows[i] = s
+                cols[i] = t
+                outgoing_degrees[s] += 1
+                incoming_degrees[t] += 1
+                edge_rowid = rowid
 
     finally:
         conn.close()
 
+    save(directory, "ids.npy", ids)
     save(directory, "sources.npy", rows)
     save(directory, "targets.npy", cols)
     save(directory, "incoming_degrees.npy", incoming_degrees)
     save(directory, "outgoing_degrees.npy", outgoing_degrees)
 
-    print("normalizing edge weights...")
+    # normalize edge weights
     # w(u,v) = 2 * (
     #   min(ln(d_out(u)+1), ln(d_in(v)+1)) / max(ln(d_out(u)+1), ln(d_in(v)+1))
     # ) / ln((d_out(u)+1) * (d_in(v)+1))
-    w_outgoing = np.log(outgoing_degrees + 1, dtype=np.float32)
-    w_incoming = np.log(incoming_degrees + 1, dtype=np.float32)
-    w_outgoing_source = w_outgoing[rows]
-    w_incoming_target = w_incoming[cols]
-    scale = (w_outgoing_source + w_incoming_target) / 2.0
-    weights = (
-        np.minimum(w_outgoing_source, w_incoming_target)
-        / np.maximum(w_outgoing_source, w_incoming_target)
-    ) / scale
+
+    # Pre-compute log transforms once
+    w_outgoing = np.log1p(outgoing_degrees, dtype=np.float32)
+    w_incoming = np.log1p(incoming_degrees, dtype=np.float32)
+
+    # Allocate final weights array
+    weights = np.zeros(edge_count, dtype=np.float32)
+
+    # Process in chunks to avoid memory issues
+    chunk_size = 1_000_000
+    for start_idx in tqdm.trange(0, edge_count, chunk_size, desc="normalizing weights"):
+        end_idx = min(start_idx + chunk_size, edge_count)
+
+        # Get chunk of row/col indices
+        chunk_rows = rows[start_idx:end_idx]
+        chunk_cols = cols[start_idx:end_idx]
+
+        # Compute weights for this chunk directly into the weights array
+        w_src = w_outgoing[chunk_rows]
+        w_dst = w_incoming[chunk_cols]
+        w_min = np.minimum(w_src, w_dst)
+        w_max = np.maximum(w_src, w_dst)
+
+        weights[start_idx:end_idx] = 2.0 * (w_min / w_max) / (w_src + w_dst)
+
     print("done!")
 
     nodes_path = os.path.join(directory, "nodes.arrow")
-    write_nodes(nodes_path, ids, incoming_degrees)
+    write_nodes(nodes_path, ids, incoming_degrees, outgoing_degrees)
     print("wrote", nodes_path)
 
     edges_path = os.path.join(directory, "edges.arrow")

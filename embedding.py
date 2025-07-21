@@ -36,7 +36,7 @@ def main():
 
     nodes_path = os.path.join(directory, "nodes.arrow")
     with NodeReader(nodes_path) as reader:
-        (node_ids, incoming_degrees) = reader.get_nodes()
+        (node_ids, incoming_degrees, outgoing_degrees) = reader.get_nodes()
 
     edges_path = os.path.join(directory, "edges.arrow")
     with EdgeReader(edges_path) as reader:
