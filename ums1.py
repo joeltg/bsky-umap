@@ -4,20 +4,19 @@ import time
 import numba
 import numpy as np
 import scipy
-import umap
+from  umap.umap_ import simplicial_set_embedding
 from dotenv import load_dotenv
 from numpy.typing import NDArray
 from pynndescent import NNDescent
 from pynndescent.distances import named_distances as pynn_named_distances
 from scipy.optimize import curve_fit
 
-# import simplicial_set_embedding
 
 load_dotenv()
 locale.setlocale(locale.LC_NUMERIC, "C")
 
 
-def css(
+def project_embeddings(
     X: NDArray[np.float32],
     n_neighbors: int,
     knn: tuple[NDArray[np.int32], NDArray[np.float32]],
@@ -27,14 +26,16 @@ def css(
     local_connectivity: float = 1.0,
     repulsion_strength: float = 1.0,
     negative_sample_rate: int = 5,
-    transform_queue_size: float = 4.0,
     a: float | None = None,
     b: float | None = None,
     metric="euclidean",
     n_epochs=500,
     init="pca",
     learning_rate=1.0,
+    n_jobs: int | None=None,
 ):
+
+
     assert metric in pynn_named_distances
     if a is None or b is None:
         a, b = find_ab_params(spread, min_dist)
@@ -44,23 +45,32 @@ def css(
     n_neighbors = knn_indices.shape[1]
     n_components = 2
 
-    random_state = np.random.RandomState()
+    if (n_jobs is not None and n_jobs > 0):
+        numba.set_num_threads(n_jobs)
+
+
     (graph, sigmas, rhos) = fuzzy_simplicial_set(
         X,
         n_neighbors=n_neighbors,
         knn_indices=knn_indices,
         knn_dists=knn_dists,
+        set_op_mix_ratio=set_op_mix_ratio,
+        local_connectivity=local_connectivity,
+        apply_set_operations=True,
     )
 
-    # Assign any points that are fully disconnected from our manifold(s) to have embedding
-    # coordinates of np.nan.  These will be filtered by our plotting functions automatically.
-    # They also prevent users from being deceived a distance query to one of these points.
-    # Might be worth moving this into simplicial_set_embedding or _fit_embed_data
-    disconnected_vertices = np.array(graph.sum(axis=1)).flatten() == 0
-    if len(disconnected_vertices) > 0:
-        X[disconnected_vertices] = np.full(n_components, np.nan)
+    print("got graph, sigmas, and rhos")
 
-    (embedding, aux_data) = umap.umap_.simplicial_set_embedding(
+    # # Assign any points that are fully disconnected from our manifold(s) to have embedding
+    # # coordinates of np.nan.  These will be filtered by our plotting functions automatically.
+    # # They also prevent users from being deceived a distance query to one of these points.
+    # # Might be worth moving this into simplicial_set_embedding or _fit_embed_data
+    # disconnected_vertices = np.array(graph.sum(axis=1)).flatten() == 0
+    # if len(disconnected_vertices) > 0:
+    #     X[disconnected_vertices] = np.full(n_components, np.nan)
+
+    random_state = np.random.RandomState()
+    (embedding, aux_data) = simplicial_set_embedding(
         X,
         graph=graph,
         n_components=n_components,
@@ -81,25 +91,26 @@ def css(
         verbose=True,
     )
 
-    if self.n_epochs_list is not None:
-        if "embedding_list" not in aux_data:
-            raise KeyError(
-                "No list of embedding were found in 'aux_data'. "
-                "It is likely the layout optimization function "
-                "doesn't support the list of int for 'n_epochs'."
-            )
-        else:
-            self.embedding_list_ = [e[inverse] for e in aux_data["embedding_list"]]
+    # if self.n_epochs_list is not None:
+    #     if "embedding_list" not in aux_data:
+    #         raise KeyError(
+    #             "No list of embedding were found in 'aux_data'. "
+    #             "It is likely the layout optimization function "
+    #             "doesn't support the list of int for 'n_epochs'."
+    #         )
+    #     else:
+    #         self.embedding_list_ = [e[inverse] for e in aux_data["embedding_list"]]
 
     # Assign any points that are fully disconnected from our manifold(s) to have embedding
     # coordinates of np.nan.  These will be filtered by our plotting functions automatically.
     # They also prevent users from being deceived a distance query to one of these points.
     # Might be worth moving this into simplicial_set_embedding or _fit_embed_data
-    disconnected_vertices = np.array(self.graph_.sum(axis=1)).flatten() == 0
+    disconnected_vertices = np.array(graph.sum(axis=1)).flatten() == 0
     if len(disconnected_vertices) > 0:
-        self.embedding_[disconnected_vertices] = np.full(self.n_components, np.nan)
+        embedding[disconnected_vertices] = np.full(n_components, np.nan)
 
-    self.embedding_ = self.embedding_[inverse]
+    return embedding
+
 
 
 def find_ab_params(spread, min_dist):
@@ -352,7 +363,8 @@ def smooth_knn_dist(distances, k, n_iter=64, local_connectivity=1.0, bandwidth=1
 
 @numba.njit(
     locals={
-        "knn_dists": numba.types.float32[:, ::1],
+        "knn_indices": numba.types.Array(numba.types.int32, 2, 'C', readonly=True),
+        "knn_dists": numba.types.Array(numba.types.float32, 2, 'C', readonly=True),
         "sigmas": numba.types.float32[::1],
         "rhos": numba.types.float32[::1],
         "val": numba.types.float32,

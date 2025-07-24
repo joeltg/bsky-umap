@@ -5,9 +5,10 @@ from typing import cast
 import numpy as np
 from dotenv import load_dotenv
 from numpy.typing import NDArray
-from umap import UMAP
+# from umap import UMAP
 
 from utils import load, save
+from ums1 import project_embeddings
 
 load_dotenv()
 
@@ -35,19 +36,32 @@ def main():
         directory, f"knn_dists-{dim}-{metric}-{n_neighbors}.npy"
     )
 
-    umap = UMAP(
+    # umap = UMAP(
+    #     n_neighbors=n_neighbors,
+    #     precomputed_knn=(knn_indices, knn_dists, None),
+    #     spread=spread,
+    #     min_dist=min_dist,
+    #     n_epochs=n_epochs,
+    #     n_jobs=n_threads,
+    #     metric=metric,
+    #     init="pca",
+    #     verbose=True,
+    # )
+
+    # positions = cast(NDArray[np.float32], umap.fit_transform(embeddings))
+
+    positions = project_embeddings(
+        embeddings,
         n_neighbors=n_neighbors,
-        precomputed_knn=(knn_indices, knn_dists, None),
-        spread=spread,
+        knn=(knn_indices, knn_dists),
         min_dist=min_dist,
+        spread=spread,
         n_epochs=n_epochs,
         n_jobs=n_threads,
         metric=metric,
         init="pca",
-        verbose=True,
     )
 
-    positions = cast(NDArray[np.float32], umap.fit_transform(embeddings))
     save(directory, f"positions-{dim}-{metric}-{n_neighbors}.npy", positions)
 
 
