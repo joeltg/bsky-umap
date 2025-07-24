@@ -18,9 +18,14 @@ $(error N_NEIGHBORS is not set)
 endif
 
 all: $(DATA)/directory.sqlite $(DATA)/atlas.sqlite
-init: $(DATA)/ids.npy $(DATA)/incoming_degrees.npy $(DATA)/outgoing_degrees.npy $(DATA)/sources.npy $(DATA)/targets.npy $(DATA)/weights.npy
+init: $(DATA)/ids.npy $(DATA)/incoming_degrees.npy $(DATA)/outgoing_degrees.npy \
+		$(DATA)/sources.npy $(DATA)/targets.npy $(DATA)/weights.npy
 embeddings: $(DATA)/embeddings-$(DIM).npy
-knn: $(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
+knn: $(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy \
+		$(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
+fss: $(DATA)/fss_rows-$(DIM)-$(METRIC)-$(n_neighbors).npy \
+		$(DATA)/fss_cols-$(DIM)-$(METRIC)-$(n_neighbors).npy \
+		$(DATA)/fss_vals-$(DIM)-$(METRIC)-$(n_neighbors).npy
 colors: $(DATA)/colors.npy
 umap: $(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
 save: $(DATA)/atlas.sqlite
@@ -46,11 +51,24 @@ $(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)
 		$(DATA)/embeddings-$(DIM).npy
 	python knn.py $(DATA)
 
-$(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: \
+$(DATA)/fss_rows-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/fss_cols-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/fss_vals-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: \
 		$(DATA)/embeddings-$(DIM).npy \
 		$(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy  \
 		$(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
+	python fuzzy_simplicial_set.py $(DATA)
+
+$(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: \
+		$(DATA)/embeddings-$(DIM).npy \
+		$(DATA)/fss_rows-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy \
+		$(DATA)/fss_cols-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy \
+		$(DATA)/fss_vals-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
 	PYTHONPATH=umap-learn python project.py $(DATA)
+
+# $(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: \
+# 		$(DATA)/embeddings-$(DIM).npy \
+# 		$(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy  \
+# 		$(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
+# 	PYTHONPATH=umap-learn python project.py $(DATA)
 
 $(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy:  \
 		$(DATA)/embeddings-$(DIM).npy
