@@ -1,10 +1,10 @@
 const std = @import("std");
 
 const cli = @import("zig-cli");
+const sqlite = @import("sqlite");
 const quadtree = @import("quadtree");
 
 const Atlas = @import("Atlas.zig");
-const File = @import("File.zig");
 
 var config = struct {
     path: []const u8 = "",
@@ -74,11 +74,11 @@ const JsonStream = std.json.WriteStream(std.fs.File.Writer, .{ .checked_to_fixed
 
 const TileWalker = struct {
     allocator: std.mem.Allocator,
-    positions: File,
-    colors: File,
-    ids: File,
     node_count: usize,
-    node_indices: []u32,
+    permutation: []u32,
+    ids: []const u32,
+    positions: []const @Vector(2, f32),
+    colors: []const u24,
     atlas: Atlas,
     tile_dir: std.fs.Dir,
     tile_path: std.ArrayList(u8),
@@ -90,40 +90,62 @@ const TileWalker = struct {
         try dir.deleteTree("tiles");
         try dir.makeDir("tiles");
         const tile_dir = try dir.openDir("tiles", .{});
-        const positions_path = try dir.realpath("positions.buffer", &path_buffer);
-        const positions = try File.init(positions_path);
-        errdefer positions.deinit();
 
-        const colors_path = try dir.realpath("colors.buffer", &path_buffer);
-        const colors = try File.init(colors_path);
-        errdefer colors.deinit();
+        const atlas_path = try dir.realpath("atlas.sqlite", &path_buffer);
+        const db = try sqlite.Database.open(.{ .path = atlas_path[0.. :0] });
+        defer db.close();
 
-        const ids_path = try dir.realpath("ids.buffer", &path_buffer);
-        const ids = try File.init(ids_path);
-        errdefer ids.deinit();
+        const node_count = count_nodes: {
+            const stmt = try db.prepare(
+                struct {},
+                struct { count: u32 },
+                "SELECT COUNT(*) AS count FROM nodes",
+            );
+            defer stmt.finalize();
+            try stmt.bind(.{});
+            const result = try stmt.step() orelse return error.Error;
+            break :count_nodes result.count;
+        };
 
-        std.log.info("positions.len: {d}", .{positions.data.len});
-        std.log.info("colors.len: {d}", .{colors.data.len});
-        std.debug.assert(positions.data.len == colors.data.len * 2);
+        const permutation = try allocator.alloc(u32, node_count);
+        errdefer allocator.free(permutation);
+        for (permutation, 0..) |*p, i| p.* = @intCast(i);
 
-        const node_count = positions.data.len / 8;
-        const node_indices = try allocator.alloc(u32, node_count);
-        errdefer allocator.free(node_indices);
+        const ids = try allocator.alloc(u32, node_count);
+        errdefer allocator.free(ids);
+
+        const positions = try allocator.alloc(@Vector(2, f32), node_count);
+        errdefer allocator.free(positions);
+
+        const colors = try allocator.alloc(u24, node_count);
+        errdefer allocator.free(colors);
 
         var min_x: f32 = 0;
         var max_x: f32 = 0;
         var min_y: f32 = 0;
         var max_y: f32 = 0;
 
-        for (0..node_count) |i| {
-            node_indices[i] = @intCast(i);
-            const offset = i * 8;
-            const x: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(positions.data[offset .. offset + 4]), .little));
-            const y: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(positions.data[offset + 4 .. offset + 8]), .little));
-            min_x = @min(min_x, x);
-            max_x = @max(max_x, x);
-            min_y = @min(min_y, y);
-            max_y = @max(max_y, y);
+        {
+            const stmt = try db.prepare(
+                struct {},
+                struct { id: u32, x: f32, y: f32, color: u24 },
+                "SELECT id, x, y, color FROM nodes ORDER BY id ASC",
+            );
+            defer stmt.finalize();
+
+            try stmt.bind(.{});
+            defer stmt.reset();
+
+            var i: u32 = 0;
+            while (try stmt.step()) |node| : (i += 1) {
+                ids[i] = node.id;
+                positions[i] = .{ node.x, node.y };
+                colors[i] = node.color;
+                min_x = @min(min_x, node.x);
+                max_x = @max(max_x, node.x);
+                min_y = @min(min_y, node.y);
+                max_y = @max(max_y, node.y);
+            }
         }
 
         const s = 2 * @max(@abs(min_x), @abs(max_x), @abs(min_y), @abs(max_y));
@@ -136,11 +158,11 @@ const TileWalker = struct {
 
         return .{
             .allocator = allocator,
+            .node_count = node_count,
+            .permutation = permutation,
+            .ids = ids,
             .positions = positions,
             .colors = colors,
-            .ids = ids,
-            .node_count = node_count,
-            .node_indices = node_indices,
             .atlas = Atlas.init(allocator, .{}),
             .tile_dir = tile_dir,
             .tile_path = std.ArrayList(u8).init(allocator),
@@ -150,11 +172,11 @@ const TileWalker = struct {
     }
 
     pub fn deinit(self: *TileWalker) void {
-        self.allocator.free(self.node_indices);
+        self.allocator.free(self.permutation);
+        self.allocator.free(self.ids);
+        self.allocator.free(self.positions);
+        self.allocator.free(self.colors);
         self.atlas.deinit();
-        self.positions.deinit();
-        self.colors.deinit();
-        self.ids.deinit();
         self.tree.deinit();
         self.tile_path.deinit();
         self.tile_nodes.deinit();
@@ -162,12 +184,8 @@ const TileWalker = struct {
     }
 
     pub fn build(self: *TileWalker) !void {
-        for (0..self.node_count) |i| {
-            const offset = i * 8;
-            const x: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(self.positions.data[offset .. offset + 4]), .little));
-            const y: f32 = @bitCast(std.mem.readInt(u32, @ptrCast(self.positions.data[offset + 4 .. offset + 8]), .little));
-            try self.tree.insert(.{ x, y }, 1.0);
-        }
+        for (0..self.node_count) |i|
+            try self.tree.insert(self.positions[i], 1.0);
 
         std.log.info("inserted {d} points into quadtree", .{self.node_count});
 
@@ -193,7 +211,7 @@ const TileWalker = struct {
 
     inline fn shuffle(self: *TileWalker, seed: u64) void {
         var rng = std.Random.Xoshiro256.init(seed);
-        rng.random().shuffle(u32, self.node_indices);
+        rng.random().shuffle(u32, self.permutation);
     }
 
     fn addTileList(self: *TileWalker, area: quadtree.Area, idx: u32, out_stream: std.fs.File.Writer) !void {
@@ -294,20 +312,23 @@ const TileWalker = struct {
         self.tile_nodes.clearRetainingCapacity();
 
         var count: u32 = 0;
-        for (self.node_indices) |i| {
-            const id = std.mem.readInt(u32, self.ids.data[i * 4 ..][0..4], .little);
-            const x: f32 = @bitCast(std.mem.readInt(u32, self.positions.data[i * 8 ..][0..4], .little));
-            const y: f32 = @bitCast(std.mem.readInt(u32, self.positions.data[i * 8 ..][4..8], .little));
-            const position = @Vector(2, f32){ x, y };
+        for (self.permutation) |i| {
+            const id = self.ids[i];
+            const p = self.positions[i];
 
-            if (!area.contains(position)) {
+            if (!area.contains(p)) {
                 continue;
             }
 
             if (!config.dry_run) {
-                try self.tile_nodes.appendSlice(self.positions.data[i * 8 ..][0..8]);
-                try self.tile_nodes.appendSlice(self.colors.data[i * 4 ..][0..4]);
-                try self.atlas.insert(.{ .id = id, .position = position });
+                var buffer: [4]u8 = undefined;
+                std.mem.writeInt(u32, &buffer, @bitCast(p[0]), .little);
+                try self.tile_nodes.appendSlice(&buffer);
+                std.mem.writeInt(u32, &buffer, @bitCast(p[1]), .little);
+                try self.tile_nodes.appendSlice(&buffer);
+                std.mem.writeInt(u32, &buffer, self.colors[i], .little);
+                try self.tile_nodes.appendSlice(&buffer);
+                try self.atlas.insert(.{ .id = id, .position = p });
             }
 
             count += 1;

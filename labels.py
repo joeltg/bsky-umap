@@ -31,22 +31,19 @@ def main():
     print("k-means clustering completed.")
 
     cluster_labels = clusterer.labels_
-    assert cluster_labels is not None
-    print("labels", type(cluster_labels), cluster_labels.shape)
-
     cluster_centers = clusterer.cluster_centers_
-    print("cluster_centers", type(cluster_centers), cluster_centers.shape)
+    assert cluster_labels is not None
 
     save(
         directory,
         f"cluster_labels-{dim}-{n_neighbors}-{n_clusters}.npy",
-        cluster_labels,
+        cluster_labels.astype(np.int32),
     )
 
     save(
         directory,
         f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy",
-        cluster_centers,
+        cluster_centers.astype(np.float32),
     )
 
 

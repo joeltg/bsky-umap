@@ -175,7 +175,7 @@ def ggvec_main(
     n_nodes,
     n_components=2,
     learning_rate=0.05,
-    tol=0.03,
+    tol=0.005,
     tol_samples=75,
     negative_ratio=0.15,
     negative_decay=0.0,

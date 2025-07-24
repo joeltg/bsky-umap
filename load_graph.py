@@ -6,7 +6,7 @@ import numpy as np
 import tqdm
 from dotenv import load_dotenv
 
-from utils import save, write_edges, write_nodes
+from utils import save
 
 load_dotenv()
 
@@ -74,49 +74,6 @@ def main():
     save(directory, "targets.npy", cols)
     save(directory, "incoming_degrees.npy", incoming_degrees)
     save(directory, "outgoing_degrees.npy", outgoing_degrees)
-
-    # normalize edge weights
-    # w(u,v) = 64 * (
-    #   min(ln(d_out(u)+1), ln(d_in(v)+1)) / max(ln(d_out(u)+1), ln(d_in(v)+1))
-    # ) / ln((d_out(u)+1) * (d_in(v)+1))
-
-    # Pre-compute log transforms once
-    w_outgoing = np.log1p(outgoing_degrees, dtype=np.float32)
-    w_incoming = np.log1p(incoming_degrees, dtype=np.float32)
-
-    # Allocate final weights array
-    weights = np.zeros(edge_count, dtype=np.float32)
-
-    # Process in chunks to avoid memory issues
-    chunk_size = 1_000_000
-    for start_idx in tqdm.trange(0, edge_count, chunk_size, desc="normalizing weights"):
-        end_idx = min(start_idx + chunk_size, edge_count)
-
-        # Get chunk of row/col indices
-        chunk_rows = rows[start_idx:end_idx]
-        chunk_cols = cols[start_idx:end_idx]
-
-        # Compute weights for this chunk directly into the weights array
-        w_src = w_outgoing[chunk_rows]
-        w_dst = w_incoming[chunk_cols]
-        w_min = np.minimum(w_src, w_dst)
-        w_max = np.maximum(w_src, w_dst)
-
-        weights[start_idx:end_idx] = 64.0 * (w_min / w_max) / (w_src + w_dst)
-
-    print("done!")
-
-    nodes_path = os.path.join(directory, "nodes.arrow")
-    write_nodes(nodes_path, ids, incoming_degrees, outgoing_degrees)
-    print("wrote", nodes_path)
-
-    edges_path = os.path.join(directory, "edges.arrow")
-    write_edges(edges_path, (weights, rows, cols))
-    print("wrote", edges_path)
-
-    ids_path = os.path.join(directory, "ids.buffer")
-    ids.tofile(ids_path)
-    print("wrote", ids_path)
 
 
 if __name__ == "__main__":

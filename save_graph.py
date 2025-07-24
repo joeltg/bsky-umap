@@ -6,7 +6,7 @@ import numpy as np
 from dotenv import load_dotenv
 from numpy.typing import NDArray
 
-from utils import NodeReader
+from utils import load
 
 load_dotenv()
 
@@ -27,29 +27,20 @@ def main():
 
     directory = arguments[0]
 
-    nodes_path = os.path.join(directory, "nodes.arrow")
-    with NodeReader(nodes_path) as reader:
-        (node_ids, incoming_degrees) = reader.get_nodes()
-
-    positions_path = os.path.join(
+    ids: NDArray[np.uint32] = load(directory, "ids.npy")
+    colors: NDArray[np.uint32] = load(directory, "colors.npy")
+    positions: NDArray[np.float32] = load(
         directory, f"positions-{dim}-{metric}-{n_neighbors}.npy"
     )
-    positions: NDArray[np.float32] = np.load(positions_path)
-    print(
-        "loaded positions",
-        positions_path,
-        positions.shape,
-        positions.dtype,
-    )
 
-    database_path = os.path.join(directory, "positions.sqlite")
+    database_path = os.path.join(directory, "atlas.sqlite")
 
     conn = sqlite3.connect(database_path)
-    cursor = conn.cursor()
 
     try:
         conn.execute("BEGIN")
 
+        cursor = conn.cursor()
         cursor.execute("DROP TABLE IF EXISTS nodes")
         cursor.execute(
             """
@@ -57,7 +48,8 @@ def main():
                 id INTEGER PRIMARY KEY NOT NULL,
                 x FLOAT NOT NULL,
                 y FLOAT NOT NULL,
-                mass FLOAT NOT NULL
+                mass FLOAT NOT NULL,
+                color INTEGER NOT NULL
             )
             """
         )
@@ -75,13 +67,13 @@ def main():
         # Prepare the data for insertion
         scale = 1000
         nodes = [
-            (int(id), float(p[0] * scale), float(p[1] * scale), 1)
-            for id, p in zip(node_ids, positions, strict=False)
+            (int(id), float(p[0]), float(p[1]), 1, int(c))
+            for id, p, c in zip(ids, positions * scale, colors, strict=False)
         ]
 
         # Insert the data into the table
         cursor.executemany(
-            "INSERT INTO nodes (id, x, y, mass) VALUES (?, ?, ?, ?)", nodes
+            "INSERT INTO nodes (id, x, y, mass, color) VALUES (?, ?, ?, ?, ?)", nodes
         )
 
         conn.commit()

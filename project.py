@@ -28,7 +28,7 @@ def main():
     directory = arguments[0]
 
     embeddings: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy")
-    knn_indices: NDArray[np.uint32] = load(
+    knn_indices: NDArray[np.int32] = load(
         directory, f"knn_indices-{dim}-{metric}-{n_neighbors}.npy"
     )
     knn_dists: NDArray[np.float32] = load(

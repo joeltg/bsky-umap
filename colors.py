@@ -9,7 +9,7 @@ from hsluv import hsluv_to_rgb
 from numpy.typing import NDArray
 from sklearn.neighbors import NearestNeighbors
 
-from utils import NodeReader, load
+from utils import load, save
 
 load_dotenv()
 
@@ -113,11 +113,11 @@ def process_chunk(
     cluster_hues: NDArray[np.float32],
     n_cycles: int,
     n_neighbors: int,
-):
+) -> tuple[int, NDArray[np.int32]]:
     start_idx, points, node_mass = chunk_data
 
     assert len(points) == len(node_mass)
-    chunk_colors = np.zeros((len(points), 4), dtype=np.uint8)
+    chunk_colors = np.zeros(len(points), dtype=np.int32)
 
     saturation = 85
 
@@ -131,8 +131,8 @@ def process_chunk(
         )
 
         rgb = hsluv_to_rgb((hue * 360, saturation, node_mass[i]))
-        chunk_colors[i, :3] = np.clip(rgb, 0, 1) * 255
-        chunk_colors[i, 3] = 255
+        (r, g, b) = (np.clip(rgb, 0, 1) * 255).astype(np.uint8)
+        chunk_colors[i] = np.int32(b << 16 | g << 8 | r)
 
     return start_idx, chunk_colors
 
@@ -149,20 +149,15 @@ def main():
 
     directory = arguments[0]
 
-    nodes_path = os.path.join(directory, "nodes.arrow")
-    with NodeReader(nodes_path) as reader:
-        (ids, incoming_degrees) = reader.get_nodes()
-
+    incoming_degrees: NDArray[np.uint32] = load(directory, "incoming_degrees.npy")
     embeddings: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy")
     cluster_centers: NDArray[np.float32] = load(
         directory, f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy"
     )
 
-    # log10(1+x) to handle zeros gracefully
     log_degrees = np.log1p(incoming_degrees) / np.log(10)
-    # Normalize to [0,1] range
     log_degrees_norm = log_degrees / np.max(log_degrees)
-    # Scale to desired lightness range (e.g., 40-90)
+
     min_lightness = 40
     max_lightness = 90
     node_mass: NDArray[np.float32] = (
@@ -197,19 +192,17 @@ def main():
     )
 
     # Create the final array to store results
-    colors = np.zeros((n_samples, 4), dtype=np.uint8)
+    colors = np.zeros(n_samples, dtype=np.int32)
 
     # Process chunks in parallel
     with Pool(processes=n_threads) as pool:
-        for chunk_num, (start_idx, chunk_colors) in enumerate(
-            pool.imap_unordered(process_chunk_partial, chunks)
+        for start_idx, chunk_colors in pool.imap_unordered(
+            process_chunk_partial, chunks
         ):
             end_idx = min(start_idx + len(chunk_colors), n_samples)
             colors[start_idx:end_idx] = chunk_colors
 
-    colors_path = os.path.join(directory, "colors.buffer")
-    print(f"Writing {colors_path}")
-    colors.tofile(colors_path)
+    save(directory, "colors.npy", colors)
 
 
 if __name__ == "__main__":

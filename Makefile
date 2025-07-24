@@ -17,12 +17,13 @@ ifndef N_NEIGHBORS
 $(error N_NEIGHBORS is not set)
 endif
 
-all: colors umap
-init: $(DATA)/directory.sqlite $(DATA)/edges.arrow $(DATA)/nodes.arrow $(DATA)/ids.buffer
+all: $(DATA)/directory.sqlite $(DATA)/atlas.sqlite
+init: $(DATA)/ids.npy $(DATA)/incoming_degrees.npy $(DATA)/outgoing_degrees.npy $(DATA)/sources.npy $(DATA)/targets.npy $(DATA)/weights.npy
 embeddings: $(DATA)/embeddings-$(DIM).npy
-colors: $(DATA)/colors.buffer
-umap: $(DATA)/positions.sqlite
-save: $(DATA)/positions.buffer $(DATA)/atlas.sqlite
+knn: $(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
+colors: $(DATA)/colors.npy
+umap: $(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
+save: $(DATA)/atlas.sqlite
 
 $(DATA)/graph.sqlite:
 	exit 1
@@ -32,41 +33,39 @@ $(DATA)/directory.sqlite: $(DATA)/graph.sqlite
 	sqlite3 $(DATA)/directory.sqlite 'ATTACH DATABASE "$(DATA)/graph.sqlite" AS graph; INSERT INTO users(id, did) SELECT rowid, did FROM graph.nodes;'
 	sqlite3 $(DATA)/directory.sqlite 'CREATE INDEX user_did ON users(did);'
 
-# $(DATA)/ids.buffer: $(DATA)/graph.sqlite
-# 	python sqlite_to_ids.py $(DATA)
+$(DATA)/ids.npy $(DATA)/incoming_degrees.npy $(DATA)/outgoing_degrees.npy $(DATA)/sources.npy $(DATA)/targets.npy: $(DATA)/graph.sqlite
+	python load_graph.py $(DATA)
 
-$(DATA)/edges.arrow $(DATA)/nodes.arrow $(DATA)/ids.buffer: $(DATA)/graph.sqlite
-	python sqlite_to_arrow.py $(DATA)
+$(DATA)/weights.npy : $(DATA)/incoming_degrees.npy $(DATA)/outgoing_degrees.npy $(DATA)/sources.npy $(DATA)/targets.npy
+	python edge_weights.py $(DATA)
 
-$(DATA)/embeddings-$(DIM).npy: $(DATA)/nodes.arrow $(DATA)/edges.arrow
+$(DATA)/embeddings-$(DIM).npy: $(DATA)/ids.npy $(DATA)/sources.npy $(DATA)/targets.npy $(DATA)/weights.npy
 	python embedding.py $(DATA)
 
-$(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: $(DATA)/embeddings-$(DIM).npy
+$(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: \
+		$(DATA)/embeddings-$(DIM).npy
 	python knn.py $(DATA)
 
-$(DATA)/positions-$(DIM)-$(N_NEIGHBORS).npy: $(DATA)/embeddings-$(DIM).npy $(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
+$(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: \
+		$(DATA)/embeddings-$(DIM).npy \
+		$(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy  \
+		$(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
 	PYTHONPATH=umap-learn python project.py $(DATA)
 
-$(DATA)/positions.buffer: $(DATA)/positions.sqlite $(DATA)/positions-$(DIM)-$(N_NEIGHBORS).npy
-	python anneal.py $(DATA)
-
-$(DATA)/positions.sqlite: $(DATA)/positions-$(DIM)-$(N_NEIGHBORS).npy
-	python save_graph.py $(DATA)
-
-$(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy: $(DATA)/embeddings-$(DIM).npy
+$(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy:  \
+		$(DATA)/embeddings-$(DIM).npy
 	python labels.py $(DATA)
 
-$(DATA)/colors.buffer: $(DATA)/nodes.arrow $(DATA)/embeddings-$(DIM).npy $(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy
+$(DATA)/colors.npy: \
+		$(DATA)/incoming_degrees.npy \
+		$(DATA)/embeddings-$(DIM).npy \
+		$(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy
 	python colors.py $(DATA)
 
-$(DATA)/atlas.sqlite: $(DATA)/positions.sqlite
-	sqlite3 $(DATA)/atlas.sqlite 'CREATE VIRTUAL TABLE nodes USING rtree(id INTEGER PRIMARY KEY, minX FLOAT NOT NULL, maxX FLOAT NOT NULL, minY FLOAT NOT NULL, maxY FLOAT NOT NULL);'
-	sqlite3 $(DATA)/atlas.sqlite 'ATTACH DATABASE "$(DATA)/positions.sqlite" AS graph; INSERT INTO nodes(id, minX, maxX, minY, maxY) SELECT rowid, x, x, y, y FROM graph.nodes;'
+$(DATA)/atlas.sqlite: $(DATA)/ids.npy $(DATA)/colors.npy $(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
+	python save_graph.py $(DATA)
 
 clean:
 	rm -f $(DATA)/directory.sqlite
-	rm -f $(DATA)/positions.sqlite
 	rm -f $(DATA)/atlas.sqlite
-	rm -f $(DATA)/*.arrow
 	rm -f $(DATA)/*.npy
-	rm -f $(DATA)/*.buffer

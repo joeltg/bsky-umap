@@ -34,7 +34,7 @@ def main():
 
     directory = arguments[0]
 
-    embeddings: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy")
+    embeddings: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy").copy()
 
     knn_search_index = NNDescent(
         data=embeddings,
