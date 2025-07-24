@@ -1,3 +1,4 @@
+import gc
 import os
 import sys
 from typing import cast
@@ -67,9 +68,11 @@ def main():
     print("constructing coo matrix")
     size = embeddings.shape[0]
     graph = coo_matrix((vals, (rows, cols)), shape=(size, size), copy=False)
+    gc.collect()
 
     print("eliminating zeros")
     graph.eliminate_zeros()
+    gc.collect()
 
     if apply_set_operations:
         transpose = graph.transpose()
@@ -80,9 +83,12 @@ def main():
             set_op_mix_ratio * (graph + transpose - prod_matrix)
             + (1.0 - set_op_mix_ratio) * prod_matrix
         )
+        gc.collect()
 
     print("back to coo format")
     graph = graph.tocoo()
+    gc.collect()
+
     save(directory, f"fss_rows-{dim}-{metric}-{n_neighbors}.npy", graph.row)
     save(directory, f"fss_cols-{dim}-{metric}-{n_neighbors}.npy", graph.col)
     save(directory, f"fss_vals-{dim}-{metric}-{n_neighbors}.npy", graph.data)
