@@ -44,7 +44,6 @@ def main():
 
     set_op_mix_ratio=1.0
     local_connectivity=1.0
-    apply_set_operations=True
 
     print("getting smooth knn dists")
     sigmas, rhos = smooth_knn_dist(
@@ -74,16 +73,27 @@ def main():
     graph.eliminate_zeros()
     gc.collect()
 
-    if apply_set_operations:
-        transpose = graph.transpose()
+    # apply set operations
 
-        prod_matrix = graph.multiply(transpose)
+    # transpose = graph.transpose()
+    # prod_matrix = graph.multiply(transpose)
+    # graph = (
+    #     set_op_mix_ratio * (graph + transpose - prod_matrix)
+    #     + (1.0 - set_op_mix_ratio) * prod_matrix
+    # )
 
-        graph = (
-            set_op_mix_ratio * (graph + transpose - prod_matrix)
-            + (1.0 - set_op_mix_ratio) * prod_matrix
-        )
-        gc.collect()
+    transpose = graph.transpose()
+
+    prod_matrix = graph.multiply(transpose)
+    graph += transpose
+    del transpose
+    graph -= prod_matrix
+    graph *= set_op_mix_ratio
+    prod_matrix *= (1.0 - set_op_mix_ratio)
+    graph += prod_matrix
+    del prod_matrix
+
+    gc.collect()
 
     print("back to coo format")
     graph = graph.tocoo()
