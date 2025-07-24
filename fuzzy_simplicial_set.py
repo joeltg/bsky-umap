@@ -45,18 +45,30 @@ def main():
     local_connectivity=1.0
     apply_set_operations=True
 
+    print("getting smooth knn dists")
     sigmas, rhos = smooth_knn_dist(
         knn_dists,
         float(n_neighbors),
         local_connectivity=float(local_connectivity),
     )
 
+    print(f"sigmas: {sigmas.shape} [{sigmas.dtype}]")
+    print(f"rhos: {rhos.shape} [{rhos.dtype}]")
+
+    print("computing membership strengths")
     rows, cols, vals = compute_membership_strengths(
         knn_indices, knn_dists, sigmas, rhos
     )
 
+    print(f"got rows: {rows.shape} [{rows.dtype}]")
+    print(f"got cols: {cols.shape} [{cols.dtype}]")
+    print(f"got vals: {vals.shape} [{vals.dtype}]")
+
+    print("constructing coo matrix")
     size = embeddings.shape[0]
     graph = coo_matrix((vals, (rows, cols)), shape=(size, size), copy=False)
+
+    print("eliminating zeros")
     graph.eliminate_zeros()
 
     if apply_set_operations:
@@ -69,6 +81,7 @@ def main():
             + (1.0 - set_op_mix_ratio) * prod_matrix
         )
 
+    print("back to coo format")
     graph = graph.tocoo()
     save(directory, f"fss_rows-{dim}-{metric}-{n_neighbors}.npy", graph.row)
     save(directory, f"fss_cols-{dim}-{metric}-{n_neighbors}.npy", graph.col)
