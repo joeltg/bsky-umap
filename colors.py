@@ -139,7 +139,6 @@ def process_chunk(
 
 def main():
     dim = int(os.environ["DIM"])
-    n_neighbors = int(os.environ["N_NEIGHBORS"])
     n_clusters = int(os.environ["N_CLUSTERS"])
     n_threads = int(os.environ["N_THREADS"])
 
@@ -152,7 +151,7 @@ def main():
     incoming_degrees: NDArray[np.uint32] = load(directory, "incoming_degrees.npy")
     embeddings: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy")
     cluster_centers: NDArray[np.float32] = load(
-        directory, f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy"
+        directory, f"cluster_centers-{dim}-{n_clusters}.npy"
     )
 
     log_degrees = np.log1p(incoming_degrees) / np.log(10)

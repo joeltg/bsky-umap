@@ -13,7 +13,6 @@ load_dotenv()
 
 def main():
     dim = int(os.environ["DIM"])
-    n_neighbors = int(os.environ["N_NEIGHBORS"])
     n_clusters = int(os.environ["N_CLUSTERS"])
 
     arguments = sys.argv[1:]
@@ -36,13 +35,13 @@ def main():
 
     save(
         directory,
-        f"cluster_labels-{dim}-{n_neighbors}-{n_clusters}.npy",
+        f"cluster_labels-{dim}-{n_clusters}.npy",
         cluster_labels.astype(np.int32),
     )
 
     save(
         directory,
-        f"cluster_centers-{dim}-{n_neighbors}-{n_clusters}.npy",
+        f"cluster_centers-{dim}-{n_clusters}.npy",
         cluster_centers.astype(np.float32),
     )
 

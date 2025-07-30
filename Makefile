@@ -70,14 +70,14 @@ $(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: \
 # 		$(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
 # 	PYTHONPATH=umap-learn python project.py $(DATA)
 
-$(DATA)/cluster_labels-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy:  \
+$(DATA)/cluster_labels-$(DIM)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_CLUSTERS).npy:  \
 		$(DATA)/embeddings-$(DIM).npy
 	python labels.py $(DATA)
 
 $(DATA)/colors.npy: \
 		$(DATA)/incoming_degrees.npy \
 		$(DATA)/embeddings-$(DIM).npy \
-		$(DATA)/cluster_centers-$(DIM)-$(N_NEIGHBORS)-$(N_CLUSTERS).npy
+		$(DATA)/cluster_centers-$(DIM)-$(N_CLUSTERS).npy
 	python colors.py $(DATA)
 
 $(DATA)/atlas.sqlite: $(DATA)/ids.npy $(DATA)/colors.npy $(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
