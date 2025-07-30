@@ -1,13 +1,13 @@
+import gc
 import os
 import sys
-from typing import cast
 
 import numba
 import numpy as np
 from dotenv import load_dotenv
 from numpy.typing import NDArray
-from scipy.sparse import coo_matrix
 from scipy.optimize import curve_fit
+from scipy.sparse import coo_matrix
 from umap.umap_ import simplicial_set_embedding
 
 from utils import load, save
@@ -70,9 +70,10 @@ def main():
 
     size = embeddings.shape[0]
     graph = coo_matrix((vals, (rows, cols)), shape=(size, size), copy=False)
+    gc.collect()
 
     random_state = np.random.RandomState()
-    learning_rate: float=1.0
+    learning_rate: float = 1.0
     negative_sample_rate: int = 5
     repulsion_strength: float = 1.0
     a, b = find_ab_params(spread, min_dist)
