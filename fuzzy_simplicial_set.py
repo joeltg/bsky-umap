@@ -1,19 +1,12 @@
 import gc
 import os
 import sys
-from typing import cast
-
-import numpy as np
-from dotenv import load_dotenv
-from numpy.typing import NDArray
 
 import numba
 import numpy as np
-from scipy.sparse import coo_matrix
 from dotenv import load_dotenv
 from numpy.typing import NDArray
-from pynndescent.distances import named_distances as pynn_named_distances
-
+from scipy.sparse import coo_matrix
 
 from utils import load, save
 
@@ -42,8 +35,8 @@ def main():
 
     numba.set_num_threads(n_threads)
 
-    set_op_mix_ratio=1.0
-    local_connectivity=1.0
+    set_op_mix_ratio = 1.0
+    local_connectivity = 1.0
 
     print("getting smooth knn dists")
     sigmas, rhos = smooth_knn_dist(
@@ -89,7 +82,7 @@ def main():
     del transpose
     graph -= prod_matrix
     graph *= set_op_mix_ratio
-    prod_matrix *= (1.0 - set_op_mix_ratio)
+    prod_matrix *= 1.0 - set_op_mix_ratio
     graph += prod_matrix
     del prod_matrix
 
@@ -102,6 +95,7 @@ def main():
     save(directory, f"fss_rows-{dim}-{metric}-{n_neighbors}.npy", graph.row)
     save(directory, f"fss_cols-{dim}-{metric}-{n_neighbors}.npy", graph.col)
     save(directory, f"fss_vals-{dim}-{metric}-{n_neighbors}.npy", graph.data)
+
 
 SMOOTH_K_TOLERANCE = 1e-5
 MIN_K_DIST_SCALE = 1e-3
@@ -193,7 +187,7 @@ def smooth_knn_dist(distances, k, n_iter=64, local_connectivity=1.0, bandwidth=1
         elif non_zero_dists.shape[0] > 0:
             rho[i] = np.max(non_zero_dists)
 
-        for n in range(n_iter):
+        for _ in range(n_iter):
             psum = 0.0
             for j in range(1, distances.shape[1]):
                 d = distances[i, j] - rho[i]
@@ -231,8 +225,8 @@ def smooth_knn_dist(distances, k, n_iter=64, local_connectivity=1.0, bandwidth=1
 
 @numba.njit(
     locals={
-        "knn_indices": numba.types.Array(numba.types.int32, 2, 'C', readonly=True),
-        "knn_dists": numba.types.Array(numba.types.float32, 2, 'C', readonly=True),
+        "knn_indices": numba.types.Array(numba.types.int32, 2, "C", readonly=True),
+        "knn_dists": numba.types.Array(numba.types.float32, 2, "C", readonly=True),
         "sigmas": numba.types.float32[::1],
         "rhos": numba.types.float32[::1],
         "val": numba.types.float32,
@@ -292,8 +286,10 @@ def compute_membership_strengths(
         for j in range(n_neighbors):
             if knn_indices[i, j] == -1:
                 continue  # We didn't get the full knn for i
-            # If applied to an adjacency matrix points shouldn't be similar to themselves.
-            # If applied to an incidence matrix (or bipartite) then the row and column indices are different.
+            # If applied to an adjacency matrix points shouldn't be similar to
+            # themselves.
+            # If applied to an incidence matrix (or bipartite) then the row and column
+            # indices are different.
             if (not bipartite) & (knn_indices[i, j] == i):
                 val = 0.0
             elif knn_dists[i, j] - rhos[i] <= 0.0 or sigmas[i] == 0.0:
@@ -306,6 +302,7 @@ def compute_membership_strengths(
             vals[i * n_neighbors + j] = val
 
     return rows, cols, vals
+
 
 if __name__ == "__main__":
     main()
