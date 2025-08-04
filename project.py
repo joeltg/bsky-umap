@@ -77,6 +77,7 @@ def main():
     negative_sample_rate: int = 5
     repulsion_strength: float = 1.0
     a, b = find_ab_params(spread, min_dist)
+    print(f"got a, b params: a={a}, b={b}")
     numba.set_num_threads(n_threads)
     (positions, aux_data) = simplicial_set_embedding(
         embeddings,

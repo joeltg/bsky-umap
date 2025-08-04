@@ -4,13 +4,12 @@ import time
 import numba
 import numpy as np
 import scipy
-from  umap.umap_ import simplicial_set_embedding
 from dotenv import load_dotenv
 from numpy.typing import NDArray
 from pynndescent import NNDescent
 from pynndescent.distances import named_distances as pynn_named_distances
 from scipy.optimize import curve_fit
-
+from umap.umap_ import simplicial_set_embedding
 
 load_dotenv()
 locale.setlocale(locale.LC_NUMERIC, "C")
@@ -32,10 +31,8 @@ def project_embeddings(
     n_epochs=500,
     init="pca",
     learning_rate=1.0,
-    n_jobs: int | None=None,
+    n_jobs: int | None = None,
 ):
-
-
     assert metric in pynn_named_distances
     if a is None or b is None:
         a, b = find_ab_params(spread, min_dist)
@@ -45,9 +42,8 @@ def project_embeddings(
     n_neighbors = knn_indices.shape[1]
     n_components = 2
 
-    if (n_jobs is not None and n_jobs > 0):
+    if n_jobs is not None and n_jobs > 0:
         numba.set_num_threads(n_jobs)
-
 
     (graph, sigmas, rhos) = fuzzy_simplicial_set(
         X,
@@ -110,7 +106,6 @@ def project_embeddings(
         embedding[disconnected_vertices] = np.full(n_components, np.nan)
 
     return embedding
-
 
 
 def find_ab_params(spread, min_dist):
@@ -363,8 +358,8 @@ def smooth_knn_dist(distances, k, n_iter=64, local_connectivity=1.0, bandwidth=1
 
 @numba.njit(
     locals={
-        "knn_indices": numba.types.Array(numba.types.int32, 2, 'C', readonly=True),
-        "knn_dists": numba.types.Array(numba.types.float32, 2, 'C', readonly=True),
+        "knn_indices": numba.types.Array(numba.types.int32, 2, "C", readonly=True),
+        "knn_dists": numba.types.Array(numba.types.float32, 2, "C", readonly=True),
         "sigmas": numba.types.float32[::1],
         "rhos": numba.types.float32[::1],
         "val": numba.types.float32,

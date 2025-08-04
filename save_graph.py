@@ -33,6 +33,16 @@ def main():
         directory, f"positions-{dim}-{metric}-{n_neighbors}.npy"
     )
 
+    cols: NDArray[np.int32] = load(
+        directory, f"fss_cols-{dim}-{metric}-{n_neighbors}.npy"
+    )
+    rows: NDArray[np.int32] = load(
+        directory, f"fss_rows-{dim}-{metric}-{n_neighbors}.npy"
+    )
+    vals: NDArray[np.float32] = load(
+        directory, f"fss_vals-{dim}-{metric}-{n_neighbors}.npy"
+    )
+
     database_path = os.path.join(directory, "atlas.sqlite")
 
     conn = sqlite3.connect(database_path)
@@ -66,14 +76,20 @@ def main():
 
         # Prepare the data for insertion
         scale = 1000
-        nodes = [
-            (int(id), float(p[0]), float(p[1]), 1, int(c))
-            for id, p, c in zip(ids, positions * scale, colors, strict=False)
-        ]
-
-        # Insert the data into the table
         cursor.executemany(
-            "INSERT INTO nodes (id, x, y, mass, color) VALUES (?, ?, ?, ?, ?)", nodes
+            "INSERT INTO nodes (id, x, y, mass, color) VALUES (?, ?, ?, ?, ?)",
+            [
+                (int(id), float(p[0]), float(p[1]), 1, int(c))
+                for id, p, c in zip(ids, positions * scale, colors, strict=False)
+            ],
+        )
+
+        cursor.executemany(
+            "INSERT INTO edges (source, target, weight) VALUES (?, ?, ?)",
+            [
+                (int(ids[row]), int(ids[col]), float(val))
+                for row, col, val in zip(rows, cols, vals, strict=False)
+            ],
         )
 
         conn.commit()
