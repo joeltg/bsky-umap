@@ -188,8 +188,14 @@ fn insertNode(self: *Atlas, idx: u24, area: Area, body: Body) !void {
         const node_position = node.getPosition();
         const node_quadrant = area.locate(node_position);
 
-        if (@reduce(.And, node_position == body.position))
+        if (@reduce(.And, node_position == body.position)) {
+            std.log.err(
+                "COLLISION: existing node {d} at ({d}, {d}) while inserting {d} at ({d}, {d})",
+                .{ node.getId(), node_position[0], node_position[1], body.id, body.position[0], body.position[1] },
+            );
+
             return error.Collision;
+        }
 
         const child_idx = try self.append(node);
         self.tree.items[idx].clear();

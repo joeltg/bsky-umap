@@ -315,6 +315,7 @@ const TileWalker = struct {
         for (self.permutation) |i| {
             const id = self.ids[i];
             const p = self.positions[i];
+            const c = self.colors[i];
 
             if (!area.contains(p)) {
                 continue;
@@ -326,7 +327,7 @@ const TileWalker = struct {
                 try self.tile_nodes.appendSlice(&buffer);
                 std.mem.writeInt(u32, &buffer, @bitCast(p[1]), .little);
                 try self.tile_nodes.appendSlice(&buffer);
-                std.mem.writeInt(u32, &buffer, self.colors[i], .little);
+                std.mem.writeInt(u32, &buffer, c, .little);
                 try self.tile_nodes.appendSlice(&buffer);
                 try self.atlas.insert(.{ .id = id, .position = p });
             }
