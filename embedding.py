@@ -1,6 +1,7 @@
 import os
 import sys
 
+import numba
 import numpy as np
 from dotenv import load_dotenv
 from numpy.typing import NDArray
@@ -27,9 +28,8 @@ def main():
     if "MAX_EPOCH" in os.environ:
         ggvec_kwargs["max_epoch"] = int(os.environ["MAX_EPOCH"])
 
-    n_threads: None | int = None
     if "N_THREADS" in os.environ:
-        n_threads = int(os.environ["N_THREADS"])
+        numba.set_num_threads(int(os.environ["N_THREADS"]))
 
     arguments = sys.argv[1:]
     if len(arguments) == 0:
@@ -41,14 +41,11 @@ def main():
     sources: NDArray[np.uint32] = load(directory, "sources.npy")
     targets: NDArray[np.uint32] = load(directory, "targets.npy")
     weights: NDArray[np.float32] = load(directory, "weights.npy")
+    G = (len(ids), sources, targets, weights)
 
     embeddings = ggvec_main(
-        src=sources,
-        dst=targets,
-        data=weights,
-        n_nodes=len(ids),
+        G,
         n_components=dim,
-        n_threads=n_threads,
         **ggvec_kwargs,
     )
 
