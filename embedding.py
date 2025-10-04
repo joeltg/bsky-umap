@@ -6,7 +6,7 @@ import numpy as np
 from dotenv import load_dotenv
 from numpy.typing import NDArray
 
-from ggvec import ggvec_main
+from ggvec.ggvec import ggvec_main
 from utils import load, save
 
 load_dotenv()
