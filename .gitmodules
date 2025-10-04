@@ -4,3 +4,6 @@
 [submodule "umap-learn"]
 	path = umap-learn
 	url = https://github.com/joeltg/umap.git
+[submodule "ggvec"]
+	path = ggvec
+	url = git@github.com:joeltg/ggvec.git
