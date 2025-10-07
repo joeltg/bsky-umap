@@ -1,9 +1,6 @@
 [submodule "quadtree/zig-rtree"]
 	path = quadtree/zig-rtree
 	url = https://github.com/nDimensional/zig-rtree
-[submodule "umap-learn"]
-	path = umap-learn
-	url = https://github.com/joeltg/umap.git
 [submodule "ggvec"]
 	path = ggvec
 	url = git@github.com:joeltg/ggvec.git
