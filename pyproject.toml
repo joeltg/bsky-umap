@@ -5,12 +5,19 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "bokeh>=3.8.0",
+    "colorcet>=3.1.0",
+    "datashader>=0.18.2",
+    "holoviews>=1.21.0",
     "hsluv==5.0.4",
+    "matplotlib>=3.10.6",
     "numba>=0.61.2",
     "numpy>=1.26.4",
+    "pandas>=2.3.3",
     "pyarrow==19.0.0",
     "pynndescent>=0.5.13",
     "python-dotenv==1.0.1",
+    "scikit-image>=0.25.2",
     "scikit-learn>=1.6.1",
     "tqdm>=4.67.1",
 ]
@@ -28,7 +35,7 @@ select = [
 
 # Ignore f-string without placeholders
 ignore = ["F541"]
- 
+
 [dependency-groups]
 dev = [
     "ruff>=0.12.0",
