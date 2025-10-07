@@ -132,7 +132,7 @@ class EdgeReader(ArrowReader):
 
     def get_edges(
         self, batch_index=0
-    ) -> tuple[NDArray[np.float32], NDArray[np.uint32], NDArray[np.uint32]]:
+    ) -> tuple[NDArray[np.float32], NDArray[np.int32], NDArray[np.int32]]:
         """Get edge data as typed numpy arrays (zero-copy).
 
         Returns:
@@ -143,6 +143,6 @@ class EdgeReader(ArrowReader):
             raise ValueError(f"Expected 3 columns for edge data, got {len(columns)}")
 
         weights: NDArray[np.float32] = columns[0]
-        sources: NDArray[np.uint32] = columns[1]
-        targets: NDArray[np.uint32] = columns[2]
+        sources: NDArray[np.int32] = columns[1]
+        targets: NDArray[np.int32] = columns[2]
         return (weights, sources, targets)
