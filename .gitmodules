@@ -7,3 +7,6 @@
 [submodule "ggvec"]
 	path = ggvec
 	url = git@github.com:joeltg/ggvec.git
+[submodule "zumap"]
+	path = zumap
+	url = git@github.com:joeltg/zumap.git
