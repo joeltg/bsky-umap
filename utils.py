@@ -23,21 +23,21 @@ ipc_write_options = pa.ipc.IpcWriteOptions(allow_64bit=True)
 edge_schema = pa.schema(
     [
         pa.field("weight", pa.float32()),
-        pa.field("source", pa.uint32()),
-        pa.field("target", pa.uint32()),
+        pa.field("source", pa.int32()),
+        pa.field("target", pa.int32()),
     ]
 )
 
 
 def write_edges(
-    path: str, edges: tuple[NDArray[np.float32], NDArray[np.uint32], NDArray[np.uint32]]
+    path: str, edges: tuple[NDArray[np.float32], NDArray[np.int32], NDArray[np.int32]]
 ):
     (weights, sources, targets) = edges
 
     data = [
         pa.array(weights, type=pa.float32()),
-        pa.array(sources, type=pa.uint32()),
-        pa.array(targets, type=pa.uint32()),
+        pa.array(sources, type=pa.int32()),
+        pa.array(targets, type=pa.int32()),
     ]
 
     with pa.OSFile(path, "wb") as sink:

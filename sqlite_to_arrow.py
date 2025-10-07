@@ -45,8 +45,8 @@ def main():
         edge_count = count(cursor, "edges")
         print(f"Number of edges: {edge_count}")
 
-        rows = np.zeros(edge_count, dtype=np.uint32)
-        cols = np.zeros(edge_count, dtype=np.uint32)
+        rows = np.zeros(edge_count, dtype=np.int32)
+        cols = np.zeros(edge_count, dtype=np.int32)
 
         chunk_size = 1_000_000
         edge_rowid = 0
