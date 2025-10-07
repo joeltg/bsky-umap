@@ -18,16 +18,13 @@ $(error N_NEIGHBORS is not set)
 endif
 
 all: $(DATA)/directory.sqlite $(DATA)/atlas.sqlite
-init: $(DATA)/ids.npy $(DATA)/incoming_degrees.npy $(DATA)/outgoing_degrees.npy \
-		$(DATA)/sources.npy $(DATA)/targets.npy $(DATA)/weights.npy
+init: $(DATA)/nodes.arrow $(DATA)/edges.arrow
 embeddings: $(DATA)/embeddings-$(DIM).npy
-knn: $(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy \
-		$(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
-fss: $(DATA)/fss_rows-$(DIM)-$(METRIC)-$(n_neighbors).npy \
-		$(DATA)/fss_cols-$(DIM)-$(METRIC)-$(n_neighbors).npy \
-		$(DATA)/fss_vals-$(DIM)-$(METRIC)-$(n_neighbors).npy
+knn: $(DATA)/knn-$(DIM)-$(METRIC)-$(N_NEIGHBORS).arrow
+fss: $(DATA)/fss-$(DIM)-$(METRIC)-$(n_neighbors).arrow
+positions: $(DATA)/positions-$(DIM)-$(METRIC)-$(n_neighbors).npy
+
 colors: $(DATA)/colors.npy
-umap: $(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
 save: $(DATA)/atlas.sqlite
 
 $(DATA)/graph.sqlite:
@@ -38,37 +35,24 @@ $(DATA)/directory.sqlite: $(DATA)/graph.sqlite
 	sqlite3 $(DATA)/directory.sqlite 'ATTACH DATABASE "$(DATA)/graph.sqlite" AS graph; INSERT INTO users(id, did) SELECT rowid, did FROM graph.nodes;'
 	sqlite3 $(DATA)/directory.sqlite 'CREATE INDEX user_did ON users(did);'
 
-$(DATA)/ids.npy $(DATA)/incoming_degrees.npy $(DATA)/outgoing_degrees.npy $(DATA)/sources.npy $(DATA)/targets.npy: $(DATA)/graph.sqlite
-	python load_graph.py $(DATA)
+$(DATA)/nodes.arrow $(DATA)/edges.arrow: $(DATA)/graph.sqlite
+	python sqlite_to_arrow.py $(DATA)
 
-$(DATA)/weights.npy : $(DATA)/incoming_degrees.npy $(DATA)/outgoing_degrees.npy $(DATA)/sources.npy $(DATA)/targets.npy
-	python edge_weights.py $(DATA)
-
-$(DATA)/embeddings-$(DIM).npy: $(DATA)/ids.npy $(DATA)/sources.npy $(DATA)/targets.npy $(DATA)/weights.npy
+$(DATA)/embeddings-$(DIM).npy: $(DATA)/nodes.arrow $(DATA)/edges.arrow
 	python embedding.py $(DATA)
 
-$(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: \
-		$(DATA)/embeddings-$(DIM).npy
+$(DATA)/knn-$(DIM)-$(METRIC)-$(N_NEIGHBORS).arrow: $(DATA)/embeddings-$(DIM).npy
 	python knn.py $(DATA)
 
-$(DATA)/fss_rows-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/fss_cols-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy $(DATA)/fss_vals-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: \
+$(DATA)/fss-$(DIM)-$(METRIC)-$(N_NEIGHBORS).arrow: \
 		$(DATA)/embeddings-$(DIM).npy \
-		$(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy  \
-		$(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
-	python fuzzy_simplicial_set.py $(DATA)
+		$(DATA)/knn-$(DIM)-$(METRIC)-$(N_NEIGHBORS).arrow
+	python fss.py $(DATA)
 
 $(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: \
 		$(DATA)/embeddings-$(DIM).npy \
-		$(DATA)/fss_rows-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy \
-		$(DATA)/fss_cols-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy \
-		$(DATA)/fss_vals-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
-	PYTHONPATH=umap-learn python project.py $(DATA)
-
-# $(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy: \
-# 		$(DATA)/embeddings-$(DIM).npy \
-# 		$(DATA)/knn_indices-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy  \
-# 		$(DATA)/knn_dists-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
-# 	PYTHONPATH=umap-learn python project.py $(DATA)
+		$(DATA)/fss-$(DIM)-$(METRIC)-$(N_NEIGHBORS).arrow
+	python positions.py $(DATA)
 
 $(DATA)/cluster_labels-$(DIM)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$(N_CLUSTERS).npy:  \
 		$(DATA)/embeddings-$(DIM).npy
@@ -80,7 +64,10 @@ $(DATA)/colors.npy: \
 		$(DATA)/cluster_centers-$(DIM)-$(N_CLUSTERS).npy
 	python colors.py $(DATA)
 
-$(DATA)/atlas.sqlite: $(DATA)/ids.npy $(DATA)/colors.npy $(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
+$(DATA)/atlas.sqlite: \
+		$(DATA)/nodes.arrow \
+		$(DATA)/colors.npy \
+		$(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
 	python save_graph.py $(DATA)
 
 clean:

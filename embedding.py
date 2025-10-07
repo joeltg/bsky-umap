@@ -2,12 +2,11 @@ import os
 import sys
 
 import numba
-import numpy as np
+import scipy
 from dotenv import load_dotenv
-from numpy.typing import NDArray
 
 from ggvec.ggvec import ggvec_main
-from utils import load, save
+from utils import EdgeReader, NodeReader, save
 
 load_dotenv()
 
@@ -37,17 +36,19 @@ def main():
 
     directory = arguments[0]
 
-    ids: NDArray[np.uint32] = load(directory, "ids.npy")
-    sources: NDArray[np.uint32] = load(directory, "sources.npy")
-    targets: NDArray[np.uint32] = load(directory, "targets.npy")
-    weights: NDArray[np.float32] = load(directory, "weights.npy")
-    G = (len(ids), sources, targets, weights)
+    nodes_path = os.path.join(directory, "nodes.arrow")
+    with NodeReader(nodes_path) as reader:
+        (ids, incoming_degrees, outgoing_degrees) = reader.get_nodes()
 
-    embeddings = ggvec_main(
-        G,
-        n_components=dim,
-        **ggvec_kwargs,
+    edges_path = os.path.join(directory, "edges.arrow")
+    with EdgeReader(edges_path) as reader:
+        (weights, sources, targets) = reader.get_edges()
+
+    G = scipy.sparse.coo_array(
+        (weights, (sources, targets)), shape=(len(ids), len(ids))
     )
+
+    embeddings = ggvec_main(G, n_components=dim, **ggvec_kwargs)
 
     save(directory, f"embeddings-{dim}.npy", embeddings)
 

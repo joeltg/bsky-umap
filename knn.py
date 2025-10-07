@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from numpy.typing import NDArray
 from pynndescent import NNDescent
 
-from utils import load, save
+from utils import load, write_knn
 
 load_dotenv()
 
@@ -51,20 +51,10 @@ def main():
     )
 
     assert knn_search_index.neighbor_graph is not None
-    knn_indices, knn_dists = knn_search_index.neighbor_graph
     print("finished nearest neighbors descent!")
 
-    save(
-        directory,
-        f"knn_indices-{dim}-{metric}-{n_neighbors}.npy",
-        knn_indices.astype(np.int32),
-    )
-
-    save(
-        directory,
-        f"knn_dists-{dim}-{metric}-{n_neighbors}.npy",
-        knn_dists.astype(np.float32),
-    )
+    knn_path = os.path.join(directory, f"knn-{dim}-{metric}-{n_neighbors}.arrow")
+    write_knn(knn_path, knn_search_index.neighbor_graph)
 
 
 if __name__ == "__main__":

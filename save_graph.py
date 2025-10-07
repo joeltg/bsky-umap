@@ -6,7 +6,7 @@ import numpy as np
 from dotenv import load_dotenv
 from numpy.typing import NDArray
 
-from utils import load
+from utils import NodeReader, load
 
 load_dotenv()
 
@@ -27,20 +27,13 @@ def main():
 
     directory = arguments[0]
 
-    ids: NDArray[np.uint32] = load(directory, "ids.npy")
+    nodes_path = os.path.join(directory, "nodes.arrow")
+    with NodeReader(nodes_path) as reader:
+        (node_ids, incoming_degrees, outgoing_degrees) = reader.get_nodes()
+
     colors: NDArray[np.uint32] = load(directory, "colors.npy")
     positions: NDArray[np.float32] = load(
         directory, f"positions-{dim}-{metric}-{n_neighbors}.npy"
-    )
-
-    cols: NDArray[np.int32] = load(
-        directory, f"fss_cols-{dim}-{metric}-{n_neighbors}.npy"
-    )
-    rows: NDArray[np.int32] = load(
-        directory, f"fss_rows-{dim}-{metric}-{n_neighbors}.npy"
-    )
-    vals: NDArray[np.float32] = load(
-        directory, f"fss_vals-{dim}-{metric}-{n_neighbors}.npy"
     )
 
     database_path = os.path.join(directory, "atlas.sqlite")
@@ -64,31 +57,13 @@ def main():
             """
         )
 
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS edges (
-                source INTEGER NOT NULL,
-                target INTEGER NOT NULL,
-                weight FLOAT NOT NULL
-            )
-            """
-        )
-
         # Prepare the data for insertion
         scale = 1000
         cursor.executemany(
             "INSERT INTO nodes (id, x, y, mass, color) VALUES (?, ?, ?, ?, ?)",
             [
                 (int(id), float(p[0]), float(p[1]), 1, int(c))
-                for id, p, c in zip(ids, positions * scale, colors, strict=False)
-            ],
-        )
-
-        cursor.executemany(
-            "INSERT INTO edges (source, target, weight) VALUES (?, ?, ?)",
-            [
-                (int(ids[row]), int(ids[col]), float(val))
-                for row, col, val in zip(rows, cols, vals, strict=False)
+                for id, p, c in zip(node_ids, positions * scale, colors, strict=False)
             ],
         )
 
