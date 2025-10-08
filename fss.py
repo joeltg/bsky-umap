@@ -35,8 +35,8 @@ def main():
     set_op_mix_ratio = 1.0
     local_connectivity = 1.0
 
-    print(f"got knn_indices with shape {knn_indices.shape}")
-    print(f"got knn_dists with shape {knn_dists.shape}")
+    print(f"got knn indices with shape {knn_indices.shape}")
+    print(f"got knn dists with shape {knn_dists.shape}")
 
     fss = fuzzy_simplicial_set(
         knn_indices=knn_indices,
