@@ -1,6 +1,7 @@
 import os
 import sys
 
+import matplotlib
 import numpy as np
 from dotenv import load_dotenv
 from numpy.typing import NDArray
@@ -8,7 +9,7 @@ from numpy.typing import NDArray
 from utils import load
 from zumap import plot
 
-# matplotlib.use("TkAgg")
+matplotlib.use("GTK4Agg")
 
 load_dotenv()
 
