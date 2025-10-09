@@ -145,21 +145,23 @@ comptime {
 
 pub const Error = std.mem.Allocator.Error || error{ Empty, OutOfBounds };
 
+allocator: std.mem.Allocator,
 area: Area,
 tree: std.ArrayList(Node),
 count: std.ArrayList(usize),
 
 pub fn init(allocator: std.mem.Allocator, area: Area) Atlas {
     return .{
+        .allocator = allocator,
         .area = area,
-        .tree = std.ArrayList(Node).init(allocator),
-        .count = std.ArrayList(usize).init(allocator),
+        .tree = std.ArrayList(Node).empty,
+        .count = std.ArrayList(usize).empty,
     };
 }
 
-pub fn deinit(self: Atlas) void {
-    self.tree.deinit();
-    self.count.deinit();
+pub fn deinit(self: *Atlas) void {
+    self.tree.deinit(self.allocator);
+    self.count.deinit(self.allocator);
 }
 
 pub fn reset(self: *Atlas, area: Area) void {
@@ -217,8 +219,8 @@ fn insertNode(self: *Atlas, idx: u24, area: Area, body: Body) !void {
 
 inline fn append(self: *Atlas, node: Node) !u24 {
     const index: u24 = @intCast(self.tree.items.len);
-    try self.tree.append(node);
-    try self.count.append(1);
+    try self.tree.append(self.allocator, node);
+    try self.count.append(self.allocator, 1);
     return index;
 }
 

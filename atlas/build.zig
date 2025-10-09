@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
     const quadtree = rtree_dep.module("quadtree");
 
     const cli_dep = b.dependency("cli", .{});
-    const cli = cli_dep.module("zig-cli");
+    const cli = cli_dep.module("cli");
 
     const atlas = b.addModule("atlas", .{
         .root_source_file = b.path("./src/Atlas.zig"),
@@ -20,10 +20,12 @@ pub fn build(b: *std.Build) void {
     {
         const lib = b.addExecutable(.{
             .name = "wasmtest",
-            .root_source_file = b.path("./lib/lib.zig"),
-            .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
-            .optimize = optimize,
             .version = .{ .major = 0, .minor = 0, .patch = 1 },
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("./lib/lib.zig"),
+                .target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding }),
+                .optimize = optimize,
+            }),
         });
 
         lib.root_module.addImport("atlas", atlas);
@@ -36,9 +38,11 @@ pub fn build(b: *std.Build) void {
     {
         const exe = b.addExecutable(.{
             .name = "quadtree-partitions",
-            .root_source_file = b.path("./src/main.zig"),
-            .optimize = optimize,
-            .target = target,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("./src/main.zig"),
+                .optimize = optimize,
+                .target = target,
+            }),
         });
 
         exe.root_module.addImport("sqlite", sqlite);

@@ -2,7 +2,7 @@
     .name = .atlas,
     .fingerprint = 0x720ad60ffa93e653,
     .version = "0.0.0",
-    .minimum_zig_version = "0.14.0",
+    .minimum_zig_version = "0.15.1",
     .paths = .{
         "src",
         "build.zig",
@@ -10,16 +10,16 @@
     },
     .dependencies = .{
         .cli = .{
-            .url = "https://github.com/sam701/zig-cli/archive/7dcc9fa4dbfe77673c97a0be6b814f208373f54c.tar.gz",
-            .hash = "cli-0.9.0-2eKe_8D2AACsJeXkYpgqPjp7vhpWpGP5d5rdQ4Y1WBnP",
+            .url = "https://github.com/sam701/zig-cli/archive/f9a516ddc9771ddd2c8c46a280a9ab6cab8261f2.tar.gz",
+            .hash = "cli-0.10.0-2eKe_5kEAQBeHqKxUHNTGnETzu81rqKWwT1WPt1jXBt0",
         },
         .rtree = .{
-            .url = "https://github.com/nDimensional/zig-rtree/archive/refs/tags/v0.2.0.tar.gz",
-            .hash = "rtree-0.2.0-O-39moyUAACwg6MbBfhOYZGV4yIbOMYABF9HCXECZyRV",
+            .url = "https://github.com/nDimensional/zig-rtree/archive/refs/tags/v0.3.0.tar.gz",
+            .hash = "rtree-0.3.0-O-39msOWAAABT7ZUkvebRExuMW6-7Kd_B6R18cWktYtJ",
         },
         .sqlite = .{
-            .url = "https://github.com/nDimensional/zig-sqlite/archive/refs/tags/v0.2.1-3500000.tar.gz",
-            .hash = "sqlite-0.2.1-3500000-djiKTjV8AADR09_68GCuPY_jsvrXyQT0KEvZ1kJeyq_7",
+            .url = "https://github.com/nDimensional/zig-sqlite/archive/refs/tags/v0.3.2-3500400.tar.gz",
+            .hash = "sqlite-0.3.2-3500400-djiKTq2AAAAliqm-sDGDX5m_-QORgokyd5JvmKkEidCg",
         },
     },
 }
