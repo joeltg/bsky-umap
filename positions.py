@@ -43,7 +43,7 @@ def main():
 
     positions = simplicial_set_embedding(
         X,
-        graph=fss,
+        G=fss,
         n_components=2,
         random_state=random_state,
         a=a,
