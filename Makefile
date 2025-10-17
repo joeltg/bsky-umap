@@ -58,7 +58,7 @@ $(DATA)/cluster_labels-$(DIM)-$(N_CLUSTERS).npy $(DATA)/cluster_centers-$(DIM)-$
 		$(DATA)/embeddings-$(DIM).npy
 	python labels.py $(DATA)
 
-$(DATA)/colors.npy: \
+$(DATA)/colors-$(DIM)-$(N_CLUSTERS).npy: \
 		$(DATA)/incoming_degrees.npy \
 		$(DATA)/embeddings-$(DIM).npy \
 		$(DATA)/cluster_centers-$(DIM)-$(N_CLUSTERS).npy
