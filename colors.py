@@ -201,7 +201,7 @@ def main():
             end_idx = min(start_idx + len(chunk_colors), n_samples)
             colors[start_idx:end_idx] = chunk_colors
 
-    save(directory, "colors.npy", colors)
+    save(directory, f"colors-{dim}-{n_clusters}.npy", colors)
 
 
 if __name__ == "__main__":
