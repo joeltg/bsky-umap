@@ -21,7 +21,9 @@ dependencies = [
     "python-dotenv==1.0.1",
     "scikit-image>=0.25.2",
     "scikit-learn>=1.6.1",
+    "torch>=2.9.0",
     "tqdm>=4.67.1",
+    "umap-learn>=0.5.9.post2",
 ]
 
 [tool.ruff]
