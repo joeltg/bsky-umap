@@ -49,6 +49,7 @@ def main():
         a=a,
         b=b,
         n_epochs=n_epochs,
+        optimize="cpu",
     )
 
     save(directory, f"positions-{dim}-{metric}-{n_neighbors}.npy", positions)
