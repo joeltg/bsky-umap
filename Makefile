@@ -21,8 +21,8 @@ all: $(DATA)/directory.sqlite $(DATA)/atlas.sqlite
 init: $(DATA)/nodes.arrow $(DATA)/edges.arrow
 embeddings: $(DATA)/embeddings-$(DIM).npy
 knn: $(DATA)/knn-$(DIM)-$(METRIC)-$(N_NEIGHBORS).arrow
-fss: $(DATA)/fss-$(DIM)-$(METRIC)-$(n_neighbors).arrow
-positions: $(DATA)/positions-$(DIM)-$(METRIC)-$(n_neighbors).npy
+fss: $(DATA)/fss-$(DIM)-$(METRIC)-$(N_NEIGHBORS).arrow
+positions: $(DATA)/positions-$(DIM)-$(METRIC)-$(N_NEIGHBORS).npy
 
 colors: $(DATA)/colors.npy
 save: $(DATA)/atlas.sqlite
