@@ -28,6 +28,8 @@ def main():
         ggvec_kwargs["max_epoch"] = int(os.environ["MAX_EPOCH"])
     if "TOL" in os.environ:
         ggvec_kwargs["tol"] = float(os.environ["TOL"])
+    if "TOL_SAMPLES" in os.environ:
+        ggvec_kwargs["tol_samples"] = int(os.environ["TOL_SAMPLES"])
 
     if "N_THREADS" in os.environ:
         numba.set_num_threads(int(os.environ["N_THREADS"]))
