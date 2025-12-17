@@ -1,7 +1,6 @@
 import os
 import sys
 
-import numpy as np
 import pyarrow as pa
 import vortex as vx
 
@@ -21,12 +20,6 @@ if __name__ == "__main__":
     weights = load(directory, "weights.npy")
     sources = load(directory, "sources.npy")
     targets = load(directory, "targets.npy")
-
-    # Sort edges by source (primary) then target (secondary) for CSR representation
-    sort_indices = np.lexsort((targets, sources))
-    weights = weights[sort_indices]
-    sources = sources[sort_indices]
-    targets = targets[sort_indices]
 
     # Sort edges by source (primary) then target (secondary) for CSR representation
     print("Sorting edges...")
