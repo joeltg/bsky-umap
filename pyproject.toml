@@ -24,6 +24,7 @@ dependencies = [
     "torch>=2.9.0",
     "tqdm>=4.67.1",
     "umap-learn>=0.5.9.post2",
+    "vortex-data>=0.56.0",
 ]
 
 [tool.ruff]
