@@ -1,6 +1,6 @@
 import sys
 
-import pyarrow as pa
+import polars as pl
 
 from utils import load, save
 
@@ -14,14 +14,17 @@ if __name__ == "__main__":
 
     # Sort edges by source (primary) then target (secondary) for CSR representation
     print("Sorting edges...")
-    edge_table = pa.table({"sources": sources, "targets": sources, "weights": weights})
-
-    sorted_table = edge_table.sort_by(
-        [("sources", "ascending"), ("targets", "ascending")]
+    df = pl.DataFrame(
+        {
+            "sources": sources,
+            "targets": targets,
+            "weights": weights,
+        }
     )
+    df = df.sort(["sources", "targets"])
 
     print("Edges sorted!")
 
-    save(directory, "weights.npy", sorted_table["weights"].to_numpy())
-    save(directory, "sources.npy", sorted_table["sources"].to_numpy())
-    save(directory, "targets.npy", sorted_table["targets"].to_numpy())
+    save(directory, "weights.npy", df["weights"].to_numpy())
+    save(directory, "sources.npy", df["sources"].to_numpy())
+    save(directory, "targets.npy", df["targets"].to_numpy())
