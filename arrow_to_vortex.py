@@ -28,16 +28,18 @@ if __name__ == "__main__":
     sources = sources[sort_indices]
     targets = targets[sort_indices]
 
-    # edges_path = os.path.join(directory, "edges.arrow")
-    # with EdgeReader(edges_path) as reader:
-    #     (weights, sources, targets) = reader.get_edges()
+    # Sort edges by source (primary) then target (secondary) for CSR representation
+    print("Sorting edges...")
+    edge_table = pa.table({"sources": sources, "targets": sources, "weights": weights})
 
-    # print("weights", weights)
-    # print("sources", sources)
-    # print("targets", targets)
+    sorted_table = edge_table.sort_by(
+        [("sources", "ascending"), ("targets", "ascending")]
+    )
 
-    # plt.hist(weights, bins=500)
-    # plt.show()
+    sources = sorted_table["sources"].to_numpy()
+    targets = sorted_table["targets"].to_numpy()
+    weights = sorted_table["weights"].to_numpy()
+    print("Edges sorted!")
 
     node_data = vx.Array.from_arrow(
         pa.StructArray.from_arrays(
