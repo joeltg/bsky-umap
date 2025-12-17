@@ -1,35 +1,61 @@
+import os
 import sys
 
 import pyarrow as pa
 import vortex as vx
 
 # import matplotlib.pyplot as plt
-from utils import EdgeReader
+from utils import load
 
 if __name__ == "__main__":
     arguments = sys.argv[1:]
-    input_path = arguments[0]
-    output_path = arguments[0]
+    directory = arguments[0]
+    # input_path = arguments[0]
+    # output_path = arguments[1]
 
-    with EdgeReader(input_path) as reader:
-        (weights, sources, targets) = reader.get_edges()
+    ids = load(directory, "ids.npy")
+    incoming_degrees = load(directory, "incoming_degrees.npy")
+    outgoing_degrees = load(directory, "outgoing_degrees.npy")
 
-    print("weights", weights)
-    print("sources", sources)
-    print("targets", targets)
+    weights = load(directory, "weights.npy")
+    sources = load(directory, "sources.npy")
+    targets = load(directory, "targets.npy")
+
+    # edges_path = os.path.join(directory, "edges.arrow")
+    # with EdgeReader(edges_path) as reader:
+    #     (weights, sources, targets) = reader.get_edges()
+
+    # print("weights", weights)
+    # print("sources", sources)
+    # print("targets", targets)
 
     # plt.hist(weights, bins=500)
     # plt.show()
 
-    dtype = vx.struct(
+    node_data = vx.Array.from_arrow(
+        pa.StructArray.from_arrays(
+            arrays=[ids, incoming_degrees, outgoing_degrees],
+            fields=[
+                # pa.field("weights", pa.float32(), nullable=False),
+                pa.field("ids", pa.int32(), nullable=False),
+                pa.field("incoming_degrees", pa.int32(), nullable=False),
+                pa.field("outgoing_degrees", pa.int32(), nullable=False),
+            ],
+        ),
+    )
+
+    assert node_data.dtype == vx.struct(
         {
-            "weights": vx.float_(32),
-            "sources": vx.int_(32),
-            "targets": vx.int_(32),
+            "ids": vx.uint(32),
+            "incoming_degrees": vx.uint(32),
+            "outgoing_degrees": vx.uint(32),
         }
     )
 
-    data = vx.Array.from_arrow(
+    node_output_path = os.path.join(directory, "nodes.vortex")
+    vx.io.write(node_data, node_output_path)
+
+    edge_data = vx.Array.from_arrow(
         pa.StructArray.from_arrays(
             arrays=[weights, sources, targets],
             fields=[
@@ -40,6 +66,13 @@ if __name__ == "__main__":
         ),
     )
 
-    assert data.dtype == dtype
+    assert edge_data.dtype == vx.struct(
+        {
+            "weights": vx.float_(32),
+            "sources": vx.int_(32),
+            "targets": vx.int_(32),
+        }
+    )
 
-    vx.io.write(data, output_path)
+    edge_output_path = os.path.join(directory, "edges.vortex")
+    vx.io.write(edge_data, edge_output_path)
