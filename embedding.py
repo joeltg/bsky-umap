@@ -16,6 +16,8 @@ def main():
 
     # Build kwargs for ggvec parameters from environment variables
     ggvec_kwargs = {}
+    if "METRIC" in os.environ:
+        ggvec_kwargs["metric"] = float(os.environ["METRIC"])
     if "LEARNING_RATE" in os.environ:
         ggvec_kwargs["learning_rate"] = float(os.environ["LEARNING_RATE"])
     if "NEGATIVE_RATIO" in os.environ:

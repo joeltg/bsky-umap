@@ -3,6 +3,7 @@ import sqlite3
 import sys
 
 import numpy as np
+import pyarrow as pa
 import tqdm
 from dotenv import load_dotenv
 
@@ -69,11 +70,29 @@ def main():
     finally:
         conn.close()
 
+    # Sort edges by source (primary) then target (secondary) for CSR representation
+    print("Sorting edges...")
+    edge_table = pa.table({"sources": rows, "targets": cols})
+
+    sorted_table = edge_table.sort_by(
+        [("sources", "ascending"), ("targets", "ascending")]
+    )
+
+    rows = sorted_table["sources"].to_numpy()
+    cols = sorted_table["targets"].to_numpy()
+    print("Edges sorted!")
+
+    nodes_path = os.path.join(directory, "nodes.arrow")
+    write_nodes(nodes_path, ids, incoming_degrees, outgoing_degrees)
+    print("wrote", nodes_path)
+
     save(directory, "ids.npy", ids)
     save(directory, "sources.npy", rows)
     save(directory, "targets.npy", cols)
     save(directory, "incoming_degrees.npy", incoming_degrees)
     save(directory, "outgoing_degrees.npy", outgoing_degrees)
+
+    print("computing weights")
 
     # normalize edge weights
     # w(u,v) = 64 * (
@@ -87,7 +106,6 @@ def main():
     # Allocate final weights array
     weights = np.zeros(edge_count, dtype=np.float32)
 
-    # Process in chunks to avoid memory issues
     chunk_size = 1_000_000
     for start_idx in tqdm.trange(0, edge_count, chunk_size, desc="normalizing weights"):
         end_idx = min(start_idx + chunk_size, edge_count)
@@ -104,15 +122,12 @@ def main():
 
         weights[start_idx:end_idx] = 64.0 * (w_min / w_max) / (w_src + w_dst)
 
-    print("done!")
+    print("done computing weights!")
 
-    nodes_path = os.path.join(directory, "nodes.arrow")
-    write_nodes(nodes_path, ids, incoming_degrees, outgoing_degrees)
-    print("wrote", nodes_path)
+    save(directory, "weights.npy", weights)
 
     edges_path = os.path.join(directory, "edges.arrow")
     write_edges(edges_path, (weights, rows, cols))
-    print("wrote", edges_path)
 
     ids_path = os.path.join(directory, "ids.buffer")
     ids.tofile(ids_path)
