@@ -40,6 +40,6 @@ if __name__ == "__main__":
         ),
     )
 
-    print("data", data, dtype, data.dtype == dtype)
+    assert data.dtype == dtype
 
     vx.io.write(data, output_path)
