@@ -36,10 +36,9 @@ if __name__ == "__main__":
         pa.StructArray.from_arrays(
             arrays=[ids, incoming_degrees, outgoing_degrees],
             fields=[
-                # pa.field("weights", pa.float32(), nullable=False),
-                pa.field("ids", pa.int32(), nullable=False),
-                pa.field("incoming_degrees", pa.int32(), nullable=False),
-                pa.field("outgoing_degrees", pa.int32(), nullable=False),
+                pa.field("ids", pa.uint32(), nullable=False),
+                pa.field("incoming_degrees", pa.uint32(), nullable=False),
+                pa.field("outgoing_degrees", pa.uint32(), nullable=False),
             ],
         ),
     )
