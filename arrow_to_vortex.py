@@ -10,8 +10,6 @@ from utils import load
 if __name__ == "__main__":
     arguments = sys.argv[1:]
     directory = arguments[0]
-    # input_path = arguments[0]
-    # output_path = arguments[1]
 
     ids = load(directory, "ids.npy")
     incoming_degrees = load(directory, "incoming_degrees.npy")
@@ -21,18 +19,6 @@ if __name__ == "__main__":
     sources = load(directory, "sources.npy")
     targets = load(directory, "targets.npy")
 
-    # Sort edges by source (primary) then target (secondary) for CSR representation
-    print("Sorting edges...")
-    edge_table = pa.table({"sources": sources, "targets": sources, "weights": weights})
-
-    sorted_table = edge_table.sort_by(
-        [("sources", "ascending"), ("targets", "ascending")]
-    )
-
-    sources = sorted_table["sources"].to_numpy()
-    targets = sorted_table["targets"].to_numpy()
-    weights = sorted_table["weights"].to_numpy()
-    print("Edges sorted!")
 
     node_data = vx.Array.from_arrow(
         pa.StructArray.from_arrays(
