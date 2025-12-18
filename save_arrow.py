@@ -15,9 +15,6 @@ if __name__ == "__main__":
     incoming_degrees = load(directory, "incoming_degrees.npy")
     outgoing_degrees = load(directory, "outgoing_degrees.npy")
 
-    weights = load(directory, "weights.npy")
-    sources = load(directory, "sources.npy")
-    targets = load(directory, "targets.npy")
 
 
     node_data = vx.Array.from_arrow(
@@ -41,6 +38,11 @@ if __name__ == "__main__":
 
     node_output_path = os.path.join(directory, "nodes.vortex")
     vx.io.write(node_data, node_output_path)
+
+    weights = load(directory, "weights.npy")
+    sources = load(directory, "sources.npy")
+    targets = load(directory, "targets.npy")
+
 
     edge_data = vx.Array.from_arrow(
         pa.StructArray.from_arrays(
