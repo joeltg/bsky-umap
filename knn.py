@@ -51,10 +51,14 @@ def main():
     )
 
     assert knn_search_index.neighbor_graph is not None
+    (indices, dists) = knn_search_index.neighbor_graph
     print("finished nearest neighbors descent!")
 
     knn_path = os.path.join(directory, f"knn-{dim}-{metric}-{n_neighbors}.arrow")
-    write_knn(knn_path, knn_search_index.neighbor_graph)
+    write_knn(knn_path, (
+        indices.astype(np.int32, copy=False),
+        dists.astype(np.float32, copy=False),
+    ))
 
 
 if __name__ == "__main__":
