@@ -23,4 +23,4 @@ if __name__ == "__main__":
     targets = load(directory, "targets.npy")
 
     edges_path = os.path.join(directory, "edges.arrow")
-    write_edges(edges_path, (weights, rows, cols))
+    write_edges(edges_path, (weights, sources, targets))
