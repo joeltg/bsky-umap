@@ -47,17 +47,3 @@ if __name__ == "__main__":
         indptr=csr_indptr,
         indices=csr_indices,
     )
-
-    print("Sorting edges by (targets, sources)")
-    df = df.sort(["targets", "sources"])
-
-    print("Computing CSC indptr...")
-    csc_indptr = compute_indptr_serial(df["targets"].to_numpy(), len(ids))
-    csc_indices = df["sources"].to_numpy()
-
-    print("Saving edges-csc.npz...")
-    np.savez(
-        os.path.join(directory, "edges-csc.npz"),
-        indptr=csc_indptr,
-        indices=csc_indices,
-    )
