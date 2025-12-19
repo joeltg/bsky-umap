@@ -2,6 +2,8 @@ import sys
 
 import numpy as np
 import polars as pl
+import pyarrow as pa
+import vortex as vx
 from llvmlite.binding.targets import os
 from numba import njit
 from numpy.typing import NDArray
@@ -10,9 +12,9 @@ from utils import load
 
 
 @njit
-def compute_indptr_serial(sources: NDArray[np.int32], N: int):
+def compute_indptr_serial(sources: NDArray[np.int32], N: int) -> NDArray[np.int32]:
     E = len(sources)
-    indptr = np.empty(N + 1, dtype=np.int64)
+    indptr = np.empty(N + 1, dtype=np.int32)
     edge_idx = 0
 
     for node in range(N + 1):
@@ -31,19 +33,23 @@ if __name__ == "__main__":
     sources: NDArray[np.int32] = load(directory, "sources.npy")
     targets: NDArray[np.int32] = load(directory, "targets.npy")
 
-    # Sort edges by source (primary) then target (secondary) for CSR representation
     df = pl.DataFrame({"sources": sources, "targets": targets})
 
     print("Sorting edges by (sources, targets)")
     df = df.sort(["sources", "targets"])
 
+    print("Saving edges-csr-indices.vortex")
+    csr_indices = df["targets"].to_numpy()
+    vx.io.write(
+        vx.Array.from_arrow(pa.array(csr_indices, type=pa.int32())),
+        os.path.join(directory, "edges-csr-indices.vortex"),
+    )
+
     print("Computing CSR indptr...")
     csr_indptr = compute_indptr_serial(df["sources"].to_numpy(), len(ids))
-    csr_indices = df["targets"].to_numpy()
 
-    print("Saving edges-csr.npz...")
-    np.savez(
-        os.path.join(directory, "edges-csr.npz"),
-        indptr=csr_indptr,
-        indices=csr_indices,
+    print("Saving edges-csr-indptr.vortex")
+    vx.io.write(
+        vx.Array.from_arrow(pa.array(csr_indptr, type=pa.int32())),
+        os.path.join(directory, "edges-csr-indptr.vortex"),
     )

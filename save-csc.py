@@ -2,6 +2,8 @@ import sys
 
 import numpy as np
 import polars as pl
+import pyarrow as pa
+import vortex as vx
 from llvmlite.binding.targets import os
 from numba import njit
 from numpy.typing import NDArray
@@ -31,19 +33,23 @@ if __name__ == "__main__":
     sources: NDArray[np.int32] = load(directory, "sources.npy")
     targets: NDArray[np.int32] = load(directory, "targets.npy")
 
-    # Sort edges by source (primary) then target (secondary) for CSR representation
     df = pl.DataFrame({"sources": sources, "targets": targets})
 
     print("Sorting edges by (targets, sources)")
     df = df.sort(["targets", "sources"])
 
+    print("Saving edges-csc-indices.vortex")
+    csc_indices = df["sources"].to_numpy()
+    vx.io.write(
+        vx.Array.from_arrow(pa.array(csc_indices, type=pa.int32())),
+        os.path.join(directory, "edges-csc-indices.vortex"),
+    )
+
     print("Computing CSC indptr...")
     csc_indptr = compute_indptr_serial(df["targets"].to_numpy(), len(ids))
-    csc_indices = df["sources"].to_numpy()
 
-    print("Saving edges-csc.npz...")
-    np.savez(
-        os.path.join(directory, "edges-csc.npz"),
-        indptr=csc_indptr,
-        indices=csc_indices,
+    print("Saving edges-csc-indptr.vortex")
+    vx.io.write(
+        vx.Array.from_arrow(pa.array(csc_indptr, type=pa.int32())),
+        os.path.join(directory, "edges-csc-indptr.vortex"),
     )
