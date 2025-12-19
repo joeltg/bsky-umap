@@ -12,9 +12,9 @@ from utils import load
 
 
 @njit
-def compute_indptr_serial(sources: NDArray[np.int32], N: int):
+def compute_indptr_serial(sources: NDArray[np.int32], N: int) -> NDArray[np.int32]:
     E = len(sources)
-    indptr = np.empty(N + 1, dtype=np.int64)
+    indptr = np.empty(N + 1, dtype=np.int32)
     edge_idx = 0
 
     for node in range(N + 1):
