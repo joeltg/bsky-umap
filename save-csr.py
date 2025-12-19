@@ -12,9 +12,9 @@ from utils import load
 
 
 @njit
-def compute_indptr_serial(sources: NDArray[np.int32], N: int) -> NDArray[np.int32]:
+def compute_indptr_serial(sources: NDArray[np.int32], N: int) -> NDArray[np.int64]:
     E = len(sources)
-    indptr = np.empty(N + 1, dtype=np.int32)
+    indptr = np.empty(N + 1, dtype=np.int64)
     edge_idx = 0
 
     for node in range(N + 1):
@@ -50,6 +50,6 @@ if __name__ == "__main__":
 
     print("Saving edges-csr-indptr.vortex")
     vx.io.write(
-        vx.Array.from_arrow(pa.array(csr_indptr, type=pa.int32())),
+        vx.Array.from_arrow(pa.array(csr_indptr, type=pa.int64())),
         os.path.join(directory, "edges-csr-indptr.vortex"),
     )
