@@ -2,13 +2,10 @@ import sys
 
 import numpy as np
 import polars as pl
-import pyarrow as pa
-import vortex as vx
-from llvmlite.binding.targets import os
 from numba import njit
 from numpy.typing import NDArray
 
-from utils import load
+from utils import load, save_array
 
 
 @njit
@@ -38,18 +35,10 @@ if __name__ == "__main__":
     print("Sorting edges by (targets, sources)")
     df = df.sort(["targets", "sources"])
 
-    print("Saving edges-csc-indices.vortex")
     csc_indices = df["sources"].to_numpy()
-    vx.io.write(
-        vx.Array.from_arrow(pa.array(csc_indices, type=pa.int32())),
-        os.path.join(directory, "edges-csc-indices.vortex"),
-    )
+    save_array(directory, "edges-csc-indices.vortex", csc_indices)
 
     print("Computing CSC indptr...")
     csc_indptr = compute_indptr_serial(df["targets"].to_numpy(), len(ids))
 
-    print("Saving edges-csc-indptr.vortex")
-    vx.io.write(
-        vx.Array.from_arrow(pa.array(csc_indptr, type=pa.int64())),
-        os.path.join(directory, "edges-csc-indptr.vortex"),
-    )
+    save_array(directory, "edges-csc-indptr.vortex", csc_indptr)

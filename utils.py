@@ -2,6 +2,8 @@ import os
 
 import numpy as np
 import pyarrow as pa
+import scipy.sparse
+import vortex as vx
 from numpy.typing import NDArray
 
 
@@ -11,11 +13,42 @@ def save(directory: str, filename: str, array: NDArray):
     np.save(path, array)
 
 
-def load(directory: str, filename: str) -> NDArray:
+def load(directory: str, filename: str, copy=False) -> NDArray:
     path = os.path.join(directory, filename)
-    array = np.load(path, mmap_mode="r")
+    if copy:
+        array = np.load(path)
+    else:
+        array = np.load(path, mmap_mode="r")
     print(f"loaded {path} {array.shape} [{array.dtype}]")
     return array
+
+
+def load_array(directory: str, path: str) -> NDArray:
+    file = vx.open(os.path.join(directory, path))
+    array = file.scan().read_all().to_numpy(zero_copy_only=False)
+    print(f"loaded {path} {array.shape} [{array.dtype}]")
+    return array
+
+
+def save_array(directory: str, filename: str, array: NDArray):
+    print(f"saving {array} {array.shape} {array.dtype}")
+    vx.io.write(
+        vx.Array.from_arrow(pa.array(array)),
+        os.path.join(directory, filename),
+    )
+
+
+def save_coo_array(path: str, G: scipy.sparse.coo_array) -> None:
+    tensor = pa.SparseCOOTensor.from_scipy(G).to_tensor()
+    with pa.OSFile(path, "wb") as sink:
+        pa.ipc.write_tensor(tensor, sink)
+
+
+def load_coo_array(path: str, copy=False) -> scipy.sparse.coo_array:
+    with pa.memory_map(path, "r") as file:
+        tensor: pa.SparseCOOTensor = pa.ipc.read_tensor(file)
+        assert isinstance(tensor, pa.SparseCOOTensor)
+        return tensor.to_scipy()
 
 
 ipc_write_options = pa.ipc.IpcWriteOptions(allow_64bit=True)
@@ -175,18 +208,30 @@ class KNNReader(ArrowReader):
 
         indices_col = batch.column(0)
         dists_col = batch.column(1)
+
         assert len(indices_col) == len(dists_col)
+        n_nodes = len(indices_col)
 
         indices_flat: NDArray[np.int32] = indices_col.values.to_numpy(
             zero_copy_only=True
         )
-        dists_flat: NDArray[np.float32] = dists_col.values.to_numpy(zero_copy_only=True)
 
-        n_nodes = len(indices_col)
+        dists_flat: NDArray[np.float32] = dists_col.values.to_numpy(
+            zero_copy_only=True,
+        )
+
         indices = indices_flat.view().reshape(n_nodes, self.n_neighbors)
         dists = dists_flat.view().reshape(n_nodes, self.n_neighbors)
 
         return (indices, dists)
+
+
+def read_knn(
+    path: str, n_neighbors: int
+) -> tuple[NDArray[np.int32], NDArray[np.float32]]:
+    with KNNReader(path, n_neighbors) as reader:
+        neighbor_graph = reader.get_knn()
+    return neighbor_graph
 
 
 def write_knn(path: str, neighbor_graph: tuple[NDArray[np.int32], NDArray[np.float32]]):
@@ -211,3 +256,18 @@ def write_knn(path: str, neighbor_graph: tuple[NDArray[np.int32], NDArray[np.flo
             writer.write(batch)
 
     print(f"wrote {path}")
+
+
+def read_coo_array(file_path: str, n_nodes: int | None = None, copy=False):
+    with EdgeReader(file_path) as reader:
+        (weights, sources, targets) = reader.get_edges()
+
+    if copy:
+        weights, sources, targets = weights.copy(), sources.copy(), targets.copy()
+
+    if n_nodes is None:
+        return scipy.sparse.coo_array((weights, (sources, targets)))
+    else:
+        return scipy.sparse.coo_array(
+            (weights, (sources, targets)), shape=(n_nodes, n_nodes)
+        )
