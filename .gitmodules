@@ -7,3 +7,6 @@
 [submodule "zumap"]
 	path = zumap
 	url = git@github.com:joeltg/zumap.git
+[submodule "jupyterlab-gruvbox-dark"]
+	path = jupyterlab-gruvbox-dark
+	url = https://github.com/joeltg/jupyterlab-gruvbox-dark.git
