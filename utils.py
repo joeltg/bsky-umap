@@ -23,15 +23,15 @@ def load(directory: str, filename: str, copy=False) -> NDArray:
     return array
 
 
-def load_array(directory: str, path: str) -> NDArray:
-    file = vx.open(os.path.join(directory, path))
+def load_array(directory: str, filename: str) -> NDArray:
+    file = vx.open(os.path.join(directory, filename))
     array = file.scan().read_all().to_numpy(zero_copy_only=False)
-    print(f"loaded {path} {array.shape} [{array.dtype}]")
+    print(f"loaded {filename} {array.shape} [{array.dtype}]")
     return array
 
 
 def save_array(directory: str, filename: str, array: NDArray):
-    print(f"saving {array} {array.shape} {array.dtype}")
+    print(f"saving {filename} {array.shape} {array.dtype}")
     vx.io.write(
         vx.Array.from_arrow(pa.array(array)),
         os.path.join(directory, filename),
