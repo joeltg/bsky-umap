@@ -53,7 +53,6 @@ def random_int_range(state, max_val):
 def ggvec_attract_kernel(
     src: NDArray[np.int32],
     dst: NDArray[np.int32],
-    weights: NDArray[np.float32],
     embeddings: NDArray[np.float32],
     learning_rate: float,
     max_loss: float,
@@ -71,8 +70,45 @@ def ggvec_attract_kernel(
     local_loss = 0.0
 
     if edge_idx < n_edges:
+        node1 = src[edge_idx]
+        node2 = dst[edge_idx]
+        target = weights[edge_idx]
+
+        # Compute dot product
+        dot = 0.0
+        for k in range(n_dims):
+            dot += embeddings[node1, k] * embeddings[node2, k]
+
+        # Compute loss
+        loss = dot - target
+        if loss < -max_loss:
+            loss = -max_loss
+        elif loss > max_loss:
+            loss = max_loss
+
+        # Update embeddings with atomics
+        for k in range(n_dims):
+            grad1 = loss * embeddings[node2, k]
+            grad2 = loss * embeddings[node1, k]
+
+            # Update node1
+            old1 = cuda.atomic.add(embeddings, (node1, k), -learning_rate * grad1)
+            new1 = old1 - learning_rate * grad1
+            if new1 < -1.0:
+                cuda.atomic.add(embeddings, (node1, k), -1.0 - new1)
+            elif new1 > 1.0:
+                cuda.atomic.add(embeddings, (node1, k), 1.0 - new1)
+
+            # Update node2
+            old2 = cuda.atomic.add(embeddings, (node2, k), -learning_rate * grad2)
+            new2 = old2 - learning_rate * grad2
+            if new2 < -1.0:
+                cuda.atomic.add(embeddings, (node2, k), -1.0 - new2)
+            elif new2 > 1.0:
+                cuda.atomic.add(embeddings, (node2, k), 1.0 - new2)
+
         # ... compute loss and update embeddings ...
-        local_loss = abs(loss)
+        local_loss += abs(loss)
 
     # Block reduction
     shared_loss[tid] = local_loss
@@ -166,7 +202,6 @@ def ggvec_cuda_main(
     n_nodes: int,
     src: NDArray[np.int32],
     dst: NDArray[np.int32],
-    weights: NDArray[np.float32],
     n_components: int = 64,
     learning_rate: float = 0.05,
     negative_ratio: float = 0.15,
@@ -216,7 +251,6 @@ def ggvec_cuda_main(
     # Copy to device
     d_src = cuda.to_device(src)
     d_dst = cuda.to_device(dst)
-    d_weights = cuda.to_device(weights)
     d_embeddings = cuda.to_device(embeddings)
     d_rng_states = cuda.to_device(rng_states)
 
@@ -246,7 +280,6 @@ def ggvec_cuda_main(
         ggvec_attract_kernel[attract_blocks, threads_per_block](
             d_src,
             d_dst,
-            d_weights,
             d_embeddings,
             learning_rate,
             max_loss,
