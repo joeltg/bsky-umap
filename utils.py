@@ -38,17 +38,38 @@ def save_array(directory: str, filename: str, array: NDArray):
     )
 
 
-def save_coo_array(path: str, G: scipy.sparse.coo_array) -> None:
-    tensor = pa.SparseCOOTensor.from_scipy(G).to_tensor()
-    with pa.OSFile(path, "wb") as sink:
-        pa.ipc.write_tensor(tensor, sink)
+def save_coo_array(
+    directory: str,
+    filename: str,
+    edges: tuple[NDArray[np.int32], NDArray[np.int32]],
+) -> None:
+    (sources, targets) = edges
+    assert sources.shape == targets.shape
+    assert sources.dtype == np.int32 and targets.dtype == np.int32
+    print(f"saving {filename} {sources.shape} ({sources.dtype}, {targets.dtype})")
+
+    table = pa.Table.from_arrays(
+        [
+            pa.array(sources, type=pa.int32()),
+            pa.array(targets, type=pa.int32()),
+        ],
+        names=["sources", "targets"],
+    )
+
+    array = vx.Array.from_arrow(table)
+
+    vx.io.write(array, os.path.join(directory, filename))
 
 
-def load_coo_array(path: str, copy=False) -> scipy.sparse.coo_array:
-    with pa.memory_map(path, "r") as file:
-        tensor: pa.SparseCOOTensor = pa.ipc.read_tensor(file)
-        assert isinstance(tensor, pa.SparseCOOTensor)
-        return tensor.to_scipy()
+def load_coo_array(
+    directory: str, filename: str
+) -> tuple[NDArray[np.int32], NDArray[np.int32]]:
+    file = vx.open(os.path.join(directory, filename))
+    array = file.scan().read_all()
+    table: pa.Table = array.to_arrow_table()
+    sources = table["sources"].to_numpy()
+    targets = table["targets"].to_numpy()
+    return (sources, targets)
 
 
 ipc_write_options = pa.ipc.IpcWriteOptions(allow_64bit=True)

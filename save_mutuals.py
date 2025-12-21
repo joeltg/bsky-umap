@@ -4,7 +4,7 @@ import numpy as np
 from numba import jit
 from numpy.typing import NDArray
 
-from utils import load, load_array, save_array
+from utils import load, load_array, save_array, save_coo_array
 
 
 @jit(nopython=True)
@@ -87,5 +87,11 @@ if __name__ == "__main__":
     assert sources.shape == targets.shape and sources.dtype == targets.dtype
     print("found mutuals", sources.shape, sources.dtype)
 
-    save_array(directory, "edges-mutual-coo-sources.vortex", sources)
-    save_array(directory, "edges-mutual-coo-targets.vortex", targets)
+    outgoing_degrees = np.bincount(sources, minlength=len(ids))
+    incoming_degrees = np.bincount(targets, minlength=len(ids))
+
+    assert np.array_equal(outgoing_degrees, incoming_degrees)
+    degrees = outgoing_degrees.astype(np.uint32)
+
+    save_coo_array(directory, "mutual-edges-coo.vortex", (sources, targets))
+    save_array(directory, "mutual-degrees.vortex", degrees)
