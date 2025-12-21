@@ -30,7 +30,7 @@ def main():
 
     directory = arguments[0]
 
-    X: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy")
+    X: NDArray[np.float32] = load(directory, f"embeddings-{dim}-{metric}.npy")
 
     fss_path = os.path.join(directory, f"fss-{dim}-{metric}-{n_neighbors}.arrow")
     with EdgeReader(fss_path) as reader:
