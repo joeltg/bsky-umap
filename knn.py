@@ -34,7 +34,9 @@ def main():
 
     directory = arguments[0]
 
-    embeddings: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy").copy()
+    embeddings: NDArray[np.float32] = load(
+        directory, f"embeddings-{dim}-{metric}.npy"
+    ).copy()
 
     knn_search_index = NNDescent(
         data=embeddings,
@@ -55,10 +57,13 @@ def main():
     print("finished nearest neighbors descent!")
 
     knn_path = os.path.join(directory, f"knn-{dim}-{metric}-{n_neighbors}.arrow")
-    write_knn(knn_path, (
-        indices.astype(np.int32, copy=False),
-        dists.astype(np.float32, copy=False),
-    ))
+    write_knn(
+        knn_path,
+        (
+            indices.astype(np.int32, copy=False),
+            dists.astype(np.float32, copy=False),
+        ),
+    )
 
 
 if __name__ == "__main__":
