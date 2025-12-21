@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from numba import cuda
 from numpy.typing import NDArray
 
-from utils import load, load_array, save
+from utils import load, load_coo_array, save
 
 load_dotenv()
 
@@ -291,8 +291,10 @@ if __name__ == "__main__":
 
     ids = load(directory, "ids.npy")
 
-    sources = load_array(directory, "edges-mutual-coo-sources.vortex")
-    targets = load_array(directory, "edges-mutual-coo-targets.vortex")
+    (sources, targets) = load_coo_array(directory, "mutual-edges-coo.vortex")
+
+    # sources = load_array(directory, "edges-mutual-coo-sources.vortex")
+    # targets = load_array(directory, "edges-mutual-coo-targets.vortex")
     weights = np.ones(len(sources), dtype=np.float32)
 
     G = scipy.sparse.coo_array(
