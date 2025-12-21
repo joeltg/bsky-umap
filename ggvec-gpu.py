@@ -257,14 +257,12 @@ def ggvec_cuda_main(
     attract_blocks = (n_edges + threads_per_block - 1) // threads_per_block
     repel_blocks = (n_neg_samples + threads_per_block - 1) // threads_per_block
 
-    d_loss = cuda.to_device(
-        np.zeros(max(attract_blocks, repel_blocks), dtype=np.float32)
-    )
+    d_loss = cuda.to_device(np.zeros(attract_blocks, dtype=np.float32))
 
     epoch_range = tqdm.trange(max_epoch)
     for epoch in epoch_range:
         # Reset loss accumulator
-        d_loss.copy_to_device(np.zeros(1, dtype=np.float32))
+        d_loss.copy_to_device(np.zeros(attract_blocks, dtype=np.float32))
 
         # Repulsion pass
         ggvec_repel_kernel[repel_blocks, threads_per_block](
