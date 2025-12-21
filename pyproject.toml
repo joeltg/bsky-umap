@@ -10,6 +10,7 @@ dependencies = [
     "datashader>=0.18.2",
     "holoviews>=1.21.0",
     "hsluv==5.0.4",
+    "jupyterlab-gruvbox-dark",
     "matplotlib>=3.10.6",
     "numba>=0.61.2",
     "numpy>=1.26.4",
@@ -28,6 +29,14 @@ dependencies = [
     "vortex-data>=0.56.0",
 ]
 
+[tool.uv.workspace]
+members = [
+    "jupyterlab-gruvbox-dark",
+]
+
+[tool.uv.sources]
+jupyterlab-gruvbox-dark = { workspace = true }
+
 [tool.ruff]
 line-length = 88
 select = [
@@ -44,5 +53,8 @@ ignore = ["F541"]
 
 [dependency-groups]
 dev = [
+    "ipykernel>=7.1.0",
+    "ipywidgets>=8.1.8",
+    "jupyterlab>=4.5.1",
     "ruff>=0.12.0",
 ]
