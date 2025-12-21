@@ -3,7 +3,6 @@ import sys
 
 import numba
 import numpy as np
-import scipy
 import tqdm
 from dotenv import load_dotenv
 from numba import cuda
@@ -326,14 +325,8 @@ if __name__ == "__main__":
 
     (sources, targets) = load_coo_array(directory, "mutual-edges-coo.vortex")
 
-    # sources = load_array(directory, "edges-mutual-coo-sources.vortex")
-    # targets = load_array(directory, "edges-mutual-coo-targets.vortex")
-    weights = np.ones(len(sources), dtype=np.float32)
-
-    G = scipy.sparse.coo_array(
-        (weights, (sources, targets)), shape=(len(ids), len(ids))
+    embeddings = ggvec_cuda_main(
+        len(ids), sources, targets, n_components=dim, **ggvec_kwargs
     )
-
-    embeddings = ggvec_cuda_main(G, n_components=dim, **ggvec_kwargs)
 
     save(directory, f"embeddings-{dim}-euclidean.npy", embeddings)
