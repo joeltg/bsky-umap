@@ -5,10 +5,14 @@ import numba
 import numpy as np
 import scipy
 import tqdm
+from dotenv import load_dotenv
 from numba import cuda
 from numpy.typing import NDArray
 
 from utils import load, load_array, save
+
+load_dotenv()
+
 
 # ================================
 # Random number generation
