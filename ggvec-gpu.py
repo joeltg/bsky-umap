@@ -71,7 +71,6 @@ def ggvec_attract_kernel(
     if edge_idx < n_edges:
         node1 = src[edge_idx]
         node2 = dst[edge_idx]
-        target = weights[edge_idx]
 
         # Compute dot product
         dot = 0.0
@@ -79,7 +78,7 @@ def ggvec_attract_kernel(
             dot += embeddings[node1, k] * embeddings[node2, k]
 
         # Compute loss
-        loss = dot - target
+        loss = dot - 1.0
         if loss < -max_loss:
             loss = -max_loss
         elif loss > max_loss:
@@ -217,8 +216,6 @@ def ggvec_cuda_main(
         Number of nodes.
     src, dst : NDArray[np.int32]
         Edge list in COO format.
-    weights : NDArray[np.float32]
-        Edge weights (typically all 1.0 for unweighted).
     n_components : int
         Embedding dimension.
     learning_rate : float
