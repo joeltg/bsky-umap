@@ -508,8 +508,8 @@ if __name__ == "__main__":
         mutual_degrees=mutual_degrees,
         n_components=dim,
         metric=metric,
-        max_epoch=500,
-        tol_samples=500,
+        # max_epoch=500,
+        # tol_samples=500,
         **ggvec_kwargs,
     )
 
