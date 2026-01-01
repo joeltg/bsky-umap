@@ -31,7 +31,7 @@ def build_all_alias_tables(
             continue
 
         if degree == 1:
-            alias_probs[start] = np.float16(1.0)
+            alias_probs[start] = np.float32(1.0)
             alias_indices[start] = indices[start]
             continue
 
@@ -89,7 +89,7 @@ def build_all_alias_tables(
 
         # Store results with actual node indices
         for i in range(degree):
-            alias_probs[start + i] = np.float16(probs[i])
+            alias_probs[start + i] = probs[i]
             alias_indices[start + i] = indices[start + aliases[i]]
 
     return alias_probs, alias_indices
