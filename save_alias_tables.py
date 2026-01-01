@@ -12,14 +12,14 @@ def build_all_alias_tables(
     indptr: NDArray[np.int64],
     indices: NDArray[np.int32],
     neighbor_degrees: NDArray[np.uint32],
-) -> tuple[NDArray[np.float16], NDArray[np.int32]]:
+) -> tuple[NDArray[np.float32], NDArray[np.int32]]:
     """
     Build alias tables for weighted sampling of each node's neighbors.
     Weight is 1/log(1 + degree) of the neighbor.
     """
     n_nodes = len(indptr) - 1
     n_edges = len(indices)
-    alias_probs = np.empty(n_edges, dtype=np.float16)
+    alias_probs = np.empty(n_edges, dtype=np.float32)
     alias_indices = np.empty(n_edges, dtype=np.int32)
 
     for A in numba.prange(n_nodes):
@@ -100,26 +100,27 @@ if __name__ == "__main__":
     directory = arguments[0]
 
     incoming_degrees: NDArray[np.uint32] = load(directory, "incoming_degrees.npy")
-    outgoing_degrees: NDArray[np.uint32] = load(directory, "outgoing_degrees.npy")
-
     csr_indptr: NDArray[np.int64] = load_array(directory, "edges-csr-indptr.vortex")
     csr_indices: NDArray[np.int32] = load_array(directory, "edges-csr-indices.vortex")
-
-    csc_indptr: NDArray[np.int64] = load_array(directory, "edges-csc-indptr.vortex")
-    csc_indices: NDArray[np.int32] = load_array(directory, "edges-csc-indices.vortex")
 
     print("computing csr alias table")
     csr_alias_probs, csr_alias_indices = build_all_alias_tables(
         csr_indptr, csr_indices, incoming_degrees
     )
 
+    csr_alias_probs = csr_alias_probs.astype(np.float16)
     save_array(directory, "edges-csr-alias-probs.vortex", csr_alias_probs)
     save_array(directory, "edges-csr-alias-indices.vortex", csr_alias_indices)
+
+    outgoing_degrees: NDArray[np.uint32] = load(directory, "outgoing_degrees.npy")
+    csc_indptr: NDArray[np.int64] = load_array(directory, "edges-csc-indptr.vortex")
+    csc_indices: NDArray[np.int32] = load_array(directory, "edges-csc-indices.vortex")
 
     print("computing csc alias table")
     csc_alias_probs, csc_alias_indices = build_all_alias_tables(
         csc_indptr, csc_indices, outgoing_degrees
     )
 
+    csc_alias_probs = csc_alias_probs.astype(np.float16)
     save_array(directory, "edges-csc-alias-probs.vortex", csc_alias_probs)
     save_array(directory, "edges-csc-alias-indices.vortex", csc_alias_indices)
