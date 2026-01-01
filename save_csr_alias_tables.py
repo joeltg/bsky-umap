@@ -19,6 +19,6 @@ if __name__ == "__main__":
         csr_indptr, csr_indices, incoming_degrees
     )
 
-    csr_alias_probs = csr_alias_probs.astype(np.float16)
+    csr_alias_probs = (csr_alias_probs * 0x10000).astype(np.uint16)
     save_array(directory, "edges-csr-alias-probs.vortex", csr_alias_probs)
     save_array(directory, "edges-csr-alias-indices.vortex", csr_alias_indices)

@@ -30,6 +30,33 @@ def update_wgrad_clipped(learning_rate: float, loss: float, w1, w2):
 
 
 @jit(nopython=True, nogil=True, fastmath=True)
+def sample_neighbor_weighted(
+    indptr: NDArray[np.int64],
+    indices: NDArray[np.int32],
+    alias_probs: NDArray[np.uint16],
+    alias_indices: NDArray[np.int32],
+    node: int,
+) -> int:
+    """Sample a neighbor with precomputed alias table weighting."""
+    start = indptr[node]
+    end = indptr[node + 1]
+    degree = end - start
+
+    if degree == 0:
+        return -1
+
+    # Pick random slot
+    slot = np.random.randint(0, degree)
+    idx = start + slot
+
+    # Alias sampling
+    if np.random.randint(0, 0x10000) < alias_probs[idx]:
+        return int(indices[idx])
+    else:
+        return int(alias_indices[idx])
+
+
+@jit(nopython=True, nogil=True, fastmath=True)
 def sample_neighbor(
     indptr: NDArray[np.int64], indices: NDArray[np.int32], node: int
 ) -> int:

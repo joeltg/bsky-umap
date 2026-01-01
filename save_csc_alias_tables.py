@@ -19,6 +19,6 @@ if __name__ == "__main__":
         csc_indptr, csc_indices, outgoing_degrees
     )
 
-    csc_alias_probs = csc_alias_probs.astype(np.float16)
+    csc_alias_probs = (csc_alias_probs * 65536.0).astype(np.uint16)
     save_array(directory, "edges-csc-alias-probs.vortex", csc_alias_probs)
     save_array(directory, "edges-csc-alias-indices.vortex", csc_alias_indices)
