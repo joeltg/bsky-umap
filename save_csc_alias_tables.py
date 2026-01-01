@@ -1,0 +1,24 @@
+import sys
+
+import numpy as np
+from numpy.typing import NDArray
+
+from alias_table import build_all_alias_tables
+from utils import load, load_array, save_array
+
+if __name__ == "__main__":
+    arguments = sys.argv[1:]
+    directory = arguments[0]
+
+    outgoing_degrees: NDArray[np.uint32] = load(directory, "outgoing_degrees.npy")
+    csc_indptr: NDArray[np.int64] = load_array(directory, "edges-csc-indptr.vortex")
+    csc_indices: NDArray[np.int32] = load_array(directory, "edges-csc-indices.vortex")
+
+    print("computing csc alias table")
+    csc_alias_probs, csc_alias_indices = build_all_alias_tables(
+        csc_indptr, csc_indices, outgoing_degrees
+    )
+
+    csc_alias_probs = csc_alias_probs.astype(np.float16)
+    save_array(directory, "edges-csc-alias-probs.vortex", csc_alias_probs)
+    save_array(directory, "edges-csc-alias-indices.vortex", csc_alias_indices)
