@@ -15,8 +15,8 @@ from numpy.typing import NDArray
 
 @jit(nopython=True, parallel=True, cache=True)
 def _node_degrees(
-    indices: NDArray[np.int32], indptr: NDArray[np.int64], num_rows: int
-) -> NDArray[np.int32]:
+    indices: NDArray[np.uint32], indptr: NDArray[np.int64], num_rows: int
+) -> NDArray[np.uint32]:
     """
     Find the degree of each node (matrix row) in a symmetric graph
     represented by CSR format (indices, indptr).
@@ -35,7 +35,7 @@ def _node_degrees(
     degree : ndarray
         Degree of each node
     """
-    degree = np.zeros(num_rows, dtype=np.int32)
+    degree = np.zeros(num_rows, dtype=np.uint32)
 
     for i in prange(num_rows):
         degree[i] = indptr[i + 1] - indptr[i]
@@ -50,12 +50,12 @@ def _node_degrees(
 
 @jit(nopython=True, cache=True)
 def _reverse_cuthill_mckee_impl(
-    indices: NDArray[np.int32],
+    indices: NDArray[np.uint32],
     indptr: NDArray[np.int64],
     num_rows: int,
-    degree: NDArray[np.int32],
-    inds: NDArray[np.int32],
-    rev_inds: NDArray[np.int32],
+    degree: NDArray[np.uint32],
+    inds: NDArray[np.uint32],
+    rev_inds: NDArray[np.uint32],
 ):
     """
     Core RCM implementation with Numba optimization.
@@ -81,12 +81,12 @@ def _reverse_cuthill_mckee_impl(
         Permutation array in RCM order
     """
     # Array to store the ordering
-    order = np.zeros(num_rows, dtype=np.int32)
+    order = np.zeros(num_rows, dtype=np.uint32)
 
     # Temporary array for insertion sort
     max_degree = np.max(degree) if num_rows > 0 else 0
-    temp_degrees = np.zeros(max_degree, dtype=np.int32)
-    temp_nodes = np.zeros(max_degree, dtype=np.int32)
+    temp_degrees = np.zeros(max_degree, dtype=np.uint32)
+    temp_nodes = np.zeros(max_degree, dtype=np.uint32)
 
     N = 0  # Current position in order array
 
@@ -153,7 +153,7 @@ def _reverse_cuthill_mckee_impl(
     return order[::-1]
 
 
-def reverse_cuthill_mckee(indices: NDArray[np.int32], indptr: NDArray[np.int64]):
+def reverse_cuthill_mckee(indices: NDArray[np.uint32], indptr: NDArray[np.int64]):
     """
     Returns the permutation array that orders a sparse symmetric CSR matrix
     in Reverse-Cuthill McKee ordering.
@@ -191,8 +191,8 @@ def reverse_cuthill_mckee(indices: NDArray[np.int32], indptr: NDArray[np.int64])
 
     Examples
     --------
-    >>> indices = np.array([1, 2, 3, 0, 2, 3, 0, 1, 3, 0, 1, 2], dtype=np.int32)
-    >>> indptr = np.array([0, 2, 4, 7, 10], dtype=np.int32)
+    >>> indices = np.array([1, 2, 3, 0, 2, 3, 0, 1, 3, 0, 1, 2], dtype=np.uint32)
+    >>> indptr = np.array([0, 2, 4, 7, 10], dtype=np.uint32)
     >>> perm = reverse_cuthill_mckee(indices, indptr, 4)
     >>> print(perm)
     """
