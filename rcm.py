@@ -11,17 +11,20 @@ if __name__ == "__main__":
     arguments = sys.argv[1:]
     directory = arguments[0]
 
-    ids = load(directory, "ids.npy", copy=True)
-    sources = load(directory, "sources.npy", copy=True)
-    targets = load(directory, "targets.npy", copy=True)
+    ids = load(directory, "ids.npy")
+    sources = load(directory, "sources.npy")
+    targets = load(directory, "targets.npy")
 
     G = coo_array(
         (np.ones(len(sources), dtype=np.float32), (sources, targets)),
         shape=(len(ids), len(ids)),
     )
 
-    perm = reverse_cuthill_mckee(G.multiply(G.T).tocsr(), symmetric_mode=True)
+    G_csr = G.tocsr()
 
-    save(directory, "ids.npy", ids[perm])
-    save(directory, "sources.npy", sources[perm])
-    save(directory, "targets.npy", targets[perm])
+    perm = reverse_cuthill_mckee(G.multiply(G.T).tocsr(), symmetric_mode=True)
+    save(directory, "perm.npy", perm)
+
+    # save(directory, "ids.npy", ids[perm])
+    # save(directory, "sources.npy", sources[perm])
+    # save(directory, "targets.npy", targets[perm])
