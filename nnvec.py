@@ -442,8 +442,6 @@ def nnvec_main(
     else:
         raise ValueError(f"Unknown metric: {metric}. Must be 'euclidean' or 'cosine'")
 
-    n_nodes = len(ids)
-
     w: NDArray[np.float32] = (
         np.random.rand(n_nodes, n_components).astype(np.float32) - 0.5
     )
