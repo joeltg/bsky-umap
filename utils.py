@@ -69,6 +69,8 @@ def load_coo_array(
     table: pa.Table = array.to_arrow_table()
     sources = table["sources"].to_numpy()
     targets = table["targets"].to_numpy()
+
+    print(f"loaded {filename} ({len(sources)}, 2) [{sources.dtype}]")
     return (sources, targets)
 
 
