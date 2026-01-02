@@ -114,13 +114,6 @@ def nnvec_edges_update_euclidean(
     We concurrently write to weights and gradients in separate threads
     This is only saved by the fact that edges >>> threads
     so pr(race condition) is very low
-
-    Couple of issues:
-        - Only one weight matrix
-        - unvectorized
-        - unsafe
-        - Assumes symmetric edges (would need two w matrix for directed graphs)
-    Implementation inspired from https://github.com/maciejkula/glove-python/blob/master/glove/glove_cython.pyx
     """
     # (n_edges,) = weights.shape
     # (src, dst) = coords
@@ -147,7 +140,7 @@ def nnvec_edges_update_euclidean(
         # track losses for early stopping
         total_loss = total_loss + np.abs(loss)
 
-    min_degree = 64
+    min_degree = 16
     for A in numba.prange(n_nodes):
         mutual_degree = mutual_degrees[A]
         if mutual_degree < min_degree:
