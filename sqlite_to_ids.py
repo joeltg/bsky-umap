@@ -5,6 +5,8 @@ import sys
 import numpy as np
 from dotenv import load_dotenv
 
+from utils import save
+
 load_dotenv()
 
 
@@ -36,6 +38,8 @@ def main():
 
     finally:
         conn.close()
+
+    save(directory, "ids.npy", ids)
 
     ids_path = os.path.join(directory, "ids.buffer")
     ids.tofile(ids_path)
