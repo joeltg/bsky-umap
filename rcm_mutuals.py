@@ -1,8 +1,7 @@
 import sys
 from typing import cast
 
-import numpy as np
-from scipy.sparse import coo_array, csr_array
+from scipy.sparse import csr_array
 
 from utils import load, save
 
@@ -10,16 +9,14 @@ if __name__ == "__main__":
     arguments = sys.argv[1:]
     directory = arguments[0]
 
-    ids = load(directory, "ids.npy")
-    sources = load(directory, "sources.npy")
-    targets = load(directory, "targets.npy")
+    data = load(directory, "csr-data.npy")
+    indices = load(directory, "csr-indices.npy")
+    indptr = load(directory, "csr-indptr.npy")
 
-    G = coo_array(
-        (np.ones(len(sources), dtype=np.float32), (sources, targets)),
-        shape=(len(ids), len(ids)),
-    )
+    G = csr_array((data, indices, indptr))
 
-    M = cast(csr_array, G.multiply(G.T).tocsr())
+    M = cast(csr_array, G.minimum(G.T).tocsr())
+    M.eliminate_zeros()
 
     save(directory, "mutuals-weights.npy", M.data)
     save(directory, "mutuals-indices.npy", M.indices)
