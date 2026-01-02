@@ -1,10 +1,9 @@
 import sys
+from typing import cast
 
 import numpy as np
-from scipy.sparse import coo_array
-from scipy.sparse.csgraph import reverse_cuthill_mckee
+from scipy.sparse import coo_array, csr_array
 
-# import matplotlib.pyplot as plt
 from utils import load, save
 
 if __name__ == "__main__":
@@ -20,9 +19,8 @@ if __name__ == "__main__":
         shape=(len(ids), len(ids)),
     )
 
-    perm = reverse_cuthill_mckee(G.multiply(G.T).tocsr(), symmetric_mode=True)
-    save(directory, "perm.npy", perm)
+    M = cast(csr_array, G.multiply(G.T).tocsr())
 
-    # save(directory, "ids.npy", ids[perm])
-    # save(directory, "sources.npy", sources[perm])
-    # save(directory, "targets.npy", targets[perm])
+    save(directory, "mutuals-weights.npy", M.data)
+    save(directory, "mutuals-indices.npy", M.indices)
+    save(directory, "mutuals-indptr.npy", M.indptr)
