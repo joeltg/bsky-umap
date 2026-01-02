@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from alias_table import build_all_alias_tables
-from utils import load, load_array, save_array
+from utils import load, load_array, save
 
 if __name__ == "__main__":
     arguments = sys.argv[1:]
@@ -20,5 +20,7 @@ if __name__ == "__main__":
     )
 
     csc_alias_probs = (csc_alias_probs * 65536.0).astype(np.uint16)
-    save_array(directory, "edges-csc-alias-probs.vortex", csc_alias_probs)
-    save_array(directory, "edges-csc-alias-indices.vortex", csc_alias_indices)
+    # save_array(directory, "edges-csc-alias-probs.vortex", csc_alias_probs)
+    # save_array(directory, "edges-csc-alias-indices.vortex", csc_alias_indices)
+    save(directory, "edges-csc-alias-probs.npy", csc_alias_probs)
+    save(directory, "edges-csc-alias-indices.npy", csc_alias_indices)

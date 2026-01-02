@@ -4,7 +4,7 @@ import numpy as np
 from numba import jit
 from numpy.typing import NDArray
 
-from utils import load, load_array, save_array, save_coo_array
+from utils import load, load_array, save
 
 
 @jit(nopython=True)
@@ -93,5 +93,11 @@ if __name__ == "__main__":
     assert np.array_equal(outgoing_degrees, incoming_degrees)
     degrees = outgoing_degrees.astype(np.uint32)
 
-    save_coo_array(directory, "mutual-edges-coo.vortex", (sources, targets))
-    save_array(directory, "mutual-degrees.vortex", degrees)
+    # upper_triangle_mask = sources < targets
+
+    save(directory, "mutual-edges-sources.npy", sources)
+    save(directory, "mutual-edges-targets.npy", targets)
+    save(directory, "mutual-degrees.npy", degrees)
+
+    # save_coo_array(directory, "mutual-edges-coo.vortex", (sources, targets))
+    # save_array(directory, "mutual-degrees.vortex", degrees)

@@ -5,7 +5,7 @@ import polars as pl
 from numba import njit
 from numpy.typing import NDArray
 
-from utils import load, save_array
+from utils import load, save
 
 
 @njit
@@ -36,9 +36,11 @@ if __name__ == "__main__":
     df = df.sort(["targets", "sources"])
 
     csc_indices = df["sources"].to_numpy()
-    save_array(directory, "edges-csc-indices.vortex", csc_indices)
+    # save_array(directory, "edges-csc-indices.vortex", csc_indices)
+    save(directory, "edges-csc-indices.npy", csc_indices)
 
     print("Computing CSC indptr...")
     csc_indptr = compute_indptr_serial(df["targets"].to_numpy(), len(ids))
 
-    save_array(directory, "edges-csc-indptr.vortex", csc_indptr)
+    # save_array(directory, "edges-csc-indptr.vortex", csc_indptr)
+    save(directory, "edges-csc-indptr.npy", csc_indptr)
