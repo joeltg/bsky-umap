@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from numba import jit
 from numpy.typing import NDArray
 
-from utils import load_array, load_coo_array, save
+from utils import load, save
 
 load_dotenv()
 
@@ -132,8 +132,6 @@ def nnvec_edges_update_euclidean(
         node1 = mutual_sources[edge]
         # Loss is dot product b/w two connected nodes
         pred = np.dot(w[node1], w[node2]) + b[node1] + b[node2]
-        # Use arcsinh(weight) instead of log(weight)
-        #     handles all real valued weights well
         loss = pred - 1.0
         # Clip the loss for numerical stability.
         if loss < -max_loss:
@@ -544,20 +542,31 @@ if __name__ == "__main__":
 
     directory = arguments[0]
 
-    csr_indices = load_array(directory, "edges-csr-indices.vortex")
-    csr_indptr = load_array(directory, "edges-csr-indptr.vortex")
-    csr_alias_probs = load_array(directory, "edges-csr-alias-probs.vortex")
-    csr_alias_indices = load_array(directory, "edges-csr-alias-indices.vortex")
+    # csr_indices = load_array(directory, "edges-csr-indices.vortex")
+    # csr_indptr = load_array(directory, "edges-csr-indptr.vortex")
+    # csr_alias_probs = load_array(directory, "edges-csr-alias-probs.vortex")
+    # csr_alias_indices = load_array(directory, "edges-csr-alias-indices.vortex")
+    csr_indices = load(directory, "edges-csr-indices.npy")
+    csr_indptr = load(directory, "edges-csr-indptr.npy")
+    csr_alias_probs = load(directory, "edges-csr-alias-probs.npy")
+    csr_alias_indices = load(directory, "edges-csr-alias-indices.npy")
 
-    csc_indices = load_array(directory, "edges-csc-indices.vortex")
-    csc_indptr = load_array(directory, "edges-csc-indptr.vortex")
-    csc_alias_probs = load_array(directory, "edges-csc-alias-probs.vortex")
-    csc_alias_indices = load_array(directory, "edges-csc-alias-indices.vortex")
+    # csc_indices = load_array(directory, "edges-csc-indices.vortex")
+    # csc_indptr = load_array(directory, "edges-csc-indptr.vortex")
+    # csc_alias_probs = load_array(directory, "edges-csc-alias-probs.vortex")
+    # csc_alias_indices = load_array(directory, "edges-csc-alias-indices.vortex")
+    csc_indices = load(directory, "edges-csc-indices.npy")
+    csc_indptr = load(directory, "edges-csc-indptr.npy")
+    csc_alias_probs = load(directory, "edges-csc-alias-probs.npy")
+    csc_alias_indices = load(directory, "edges-csc-alias-indices.npy")
 
-    (mutual_sources, mutual_targets) = load_coo_array(
-        directory, "mutual-edges-coo.vortex"
-    )
-    mutual_degrees = load_array(directory, "mutual-degrees.vortex")
+    # (mutual_sources, mutual_targets) = load_coo_array(
+    #     directory, "mutual-edges-coo.vortex"
+    # )
+    # mutual_degrees = load_array(directory, "mutual-degrees.vortex")
+    mutual_sources = load(directory, "mutual-edges-sources.npy")
+    mutual_targets = load(directory, "mutual-edges-targets.npy")
+    mutual_degrees = load(directory, "mutual-degrees.npy")
 
     embeddings = nnvec_main(
         len(mutual_degrees),
