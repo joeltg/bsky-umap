@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from numba import jit
 from numpy.typing import NDArray
 
-from utils import load, load_array, load_coo_array, save
+from utils import load_array, load_coo_array, save
 
 load_dotenv()
 
@@ -92,8 +92,12 @@ def nnvec_edges_update_euclidean(
     n_nodes: int,
     csr_indices: NDArray[np.int32],
     csr_indptr: NDArray[np.int64],
+    csr_alias_probs: NDArray[np.uint16],
+    csr_alias_indices: NDArray[np.int32],
     csc_indices: NDArray[np.int32],
     csc_indptr: NDArray[np.int64],
+    csc_alias_probs: NDArray[np.uint16],
+    csc_alias_indices: NDArray[np.int32],
     mutual_sources: NDArray[np.int32],
     mutual_targets: NDArray[np.int32],
     mutual_degrees: NDArray[np.uint32],
@@ -151,9 +155,19 @@ def nnvec_edges_update_euclidean(
         if mutual_degree < min_degree:
             for _ in range(min_degree - mutual_degree):
                 # Co-follower attraction: A follows T, B also follows T
-                T = sample_neighbor(csr_indptr, csr_indices, A)
+                # Choose T with weight inversely proportional to incoming degree
+
+                # T = sample_neighbor(csr_indptr, csr_indices, A)
+                T = sample_neighbor_weighted(
+                    csr_indptr, csr_indices, csr_alias_probs, csr_alias_indices, A
+                )
+
                 if T != -1:
-                    B = sample_neighbor(csc_indptr, csc_indices, T)
+                    # B = sample_neighbor(csc_indptr, csc_indices, T)
+                    B = sample_neighbor_weighted(
+                        csc_indptr, csc_indices, csc_alias_probs, csc_alias_indices, T
+                    )
+
                     if B != -1 and B != A:
                         pred = np.dot(w[A], w[B])
                         loss = pred - 1.0
@@ -165,9 +179,19 @@ def nnvec_edges_update_euclidean(
                         total_loss += np.abs(loss)
 
                 # Co-followed attraction: S follows A, S also follows B
-                S = sample_neighbor(csc_indptr, csc_indices, A)
+                # Choose S with weight inversely proportional to outgoing degree
+
+                # S = sample_neighbor(csc_indptr, csc_indices, A)
+                S = sample_neighbor_weighted(
+                    csc_indptr, csc_indices, csc_alias_probs, csc_alias_indices, A
+                )
+
                 if S != -1:
-                    B = sample_neighbor(csr_indptr, csr_indices, S)
+                    # B = sample_neighbor(csr_indptr, csr_indices, S)
+                    B = sample_neighbor_weighted(
+                        csr_indptr, csr_indices, csr_alias_probs, csr_alias_indices, S
+                    )
+
                     if B != -1 and B != A:
                         pred = np.dot(w[A], w[B])
                         loss = pred - 1.0
@@ -190,7 +214,7 @@ def nnvec_reverse_euclidean(
     max_loss=10.0,
 ):
     """
-    Negative sampling GGVec pass (Euclidean/dot product version)
+    Negative sampling NNVec pass (Euclidean/dot product version)
 
     negative_edges : array shaped [n_samples, 2]
         We pass in here to hoist out the complexity of
@@ -223,8 +247,12 @@ def nnvec_edges_update_cosine(
     n_nodes: int,
     csr_indices: NDArray[np.int32],
     csr_indptr: NDArray[np.int64],
+    csr_alias_probs: NDArray[np.uint16],
+    csr_alias_indices: NDArray[np.int32],
     csc_indices: NDArray[np.int32],
     csc_indptr: NDArray[np.int64],
+    csc_alias_probs: NDArray[np.uint16],
+    csc_alias_indices: NDArray[np.int32],
     mutual_sources: NDArray[np.int32],
     mutual_targets: NDArray[np.int32],
     mutual_degrees: NDArray[np.uint32],
@@ -287,7 +315,7 @@ def nnvec_reverse_cosine(
     max_loss=10.0,
 ):
     """
-    Negative sampling GGVec pass (Cosine similarity version)
+    Negative sampling NNVec pass (Cosine similarity version)
     """
     nnodes = w.shape[0]
     for _ in numba.prange(n_edges):
@@ -337,8 +365,12 @@ def nnvec_main(
     n_nodes: int,
     csr_indices: NDArray[np.int32],
     csr_indptr: NDArray[np.int64],
+    csr_alias_probs: NDArray[np.uint16],
+    csr_alias_indices: NDArray[np.int32],
     csc_indices: NDArray[np.int32],
     csc_indptr: NDArray[np.int64],
+    csc_alias_probs: NDArray[np.uint16],
+    csc_alias_indices: NDArray[np.int32],
     mutual_sources: NDArray[np.int32],
     mutual_targets: NDArray[np.int32],
     mutual_degrees: NDArray[np.uint32],
@@ -354,7 +386,7 @@ def nnvec_main(
     metric: Literal["euclidean", "cosine"] = "euclidean",
 ):
     """
-    GGVec: Fast global first (and higher) order local embeddings.
+    NNVec: Fast global first (and higher) order local embeddings.
 
     This algorithm directly minimizes related nodes' distances.
     It uses a relaxation pass (negative sample) + contraction pass (loss minimization)
@@ -434,8 +466,12 @@ def nnvec_main(
             n_nodes=n_nodes,
             csr_indices=csr_indices,
             csr_indptr=csr_indptr,
+            csr_alias_probs=csr_alias_probs,
+            csr_alias_indices=csr_alias_indices,
             csc_indices=csc_indices,
             csc_indptr=csc_indptr,
+            csc_alias_probs=csc_alias_probs,
+            csc_alias_indices=csc_alias_indices,
             mutual_sources=mutual_sources,
             mutual_targets=mutual_targets,
             mutual_degrees=mutual_degrees,
@@ -484,22 +520,22 @@ if __name__ == "__main__":
     dim = int(os.environ["DIM"])
     metric = cast(Literal["cosine", "euclidean"], os.environ["METRIC"])
 
-    # Build kwargs for ggvec parameters from environment variables
-    ggvec_kwargs = {}
+    # Build kwargs for nnvec parameters from environment variables
+    nnvec_kwargs = {}
     if "LEARNING_RATE" in os.environ:
-        ggvec_kwargs["learning_rate"] = float(os.environ["LEARNING_RATE"])
+        nnvec_kwargs["learning_rate"] = float(os.environ["LEARNING_RATE"])
     if "NEGATIVE_RATIO" in os.environ:
-        ggvec_kwargs["negative_ratio"] = float(os.environ["NEGATIVE_RATIO"])
+        nnvec_kwargs["negative_ratio"] = float(os.environ["NEGATIVE_RATIO"])
     if "NEGATIVE_DECAY" in os.environ:
-        ggvec_kwargs["negative_decay"] = float(os.environ["NEGATIVE_DECAY"])
+        nnvec_kwargs["negative_decay"] = float(os.environ["NEGATIVE_DECAY"])
     if "MAX_LOSS" in os.environ:
-        ggvec_kwargs["max_loss"] = float(os.environ["MAX_LOSS"])
+        nnvec_kwargs["max_loss"] = float(os.environ["MAX_LOSS"])
     if "MAX_EPOCH" in os.environ:
-        ggvec_kwargs["max_epoch"] = int(os.environ["MAX_EPOCH"])
+        nnvec_kwargs["max_epoch"] = int(os.environ["MAX_EPOCH"])
     if "TOL" in os.environ:
-        ggvec_kwargs["tol"] = float(os.environ["TOL"])
+        nnvec_kwargs["tol"] = float(os.environ["TOL"])
     if "TOL_SAMPLES" in os.environ:
-        ggvec_kwargs["tol_samples"] = int(os.environ["TOL_SAMPLES"])
+        nnvec_kwargs["tol_samples"] = int(os.environ["TOL_SAMPLES"])
 
     if "N_THREADS" in os.environ:
         numba.set_num_threads(int(os.environ["N_THREADS"]))
@@ -510,26 +546,31 @@ if __name__ == "__main__":
 
     directory = arguments[0]
 
-    ids: NDArray[np.uint32] = load(directory, "ids.npy")
-
     csr_indices = load_array(directory, "edges-csr-indices.vortex")
     csr_indptr = load_array(directory, "edges-csr-indptr.vortex")
+    csr_alias_probs = load_array(directory, "edges-csr-alias-probs.vortex")
+    csr_alias_indices = load_array(directory, "edges-csr-alias-indices.vortex")
+
     csc_indices = load_array(directory, "edges-csc-indices.vortex")
     csc_indptr = load_array(directory, "edges-csc-indptr.vortex")
+    csc_alias_probs = load_array(directory, "edges-csc-alias-probs.vortex")
+    csc_alias_indices = load_array(directory, "edges-csc-alias-indices.vortex")
 
-    # mutual_sources = load_array(directory, "edges-mutual-coo-sources.vortex")
-    # mutual_targets = load_array(directory, "edges-mutual-coo-targets.vortex")
     (mutual_sources, mutual_targets) = load_coo_array(
         directory, "mutual-edges-coo.vortex"
     )
     mutual_degrees = load_array(directory, "mutual-degrees.vortex")
 
     embeddings = nnvec_main(
-        len(ids),
+        len(mutual_degrees),
         csr_indices=csr_indices,
         csr_indptr=csr_indptr,
+        csr_alias_probs=csr_alias_probs,
+        csr_alias_indices=csr_alias_indices,
         csc_indices=csc_indices,
         csc_indptr=csc_indptr,
+        csc_alias_probs=csc_alias_probs,
+        csc_alias_indices=csc_alias_indices,
         mutual_sources=mutual_sources,
         mutual_targets=mutual_targets,
         mutual_degrees=mutual_degrees,
@@ -537,7 +578,7 @@ if __name__ == "__main__":
         metric=metric,
         # max_epoch=500,
         # tol_samples=500,
-        **ggvec_kwargs,
+        **nnvec_kwargs,
     )
 
     save(directory, f"embeddings-{dim}-nnvec-{metric}.npy", embeddings)
