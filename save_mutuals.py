@@ -4,7 +4,7 @@ import numpy as np
 from numba import jit
 from numpy.typing import NDArray
 
-from utils import load, load_array, save
+from utils import load, save
 
 
 @jit(nopython=True)
@@ -71,10 +71,14 @@ if __name__ == "__main__":
 
     ids: NDArray[np.uint32] = load(directory, "ids.npy")
 
-    csr_indices: NDArray[np.int32] = load_array(directory, "edges-csr-indices.vortex")
-    csr_indptr: NDArray[np.int64] = load_array(directory, "edges-csr-indptr.vortex")
-    csc_indices: NDArray[np.int32] = load_array(directory, "edges-csc-indices.vortex")
-    csc_indptr: NDArray[np.int64] = load_array(directory, "edges-csc-indptr.vortex")
+    # csr_indices: NDArray[np.int32] = load_array(directory, "edges-csr-indices.vortex")
+    # csr_indptr: NDArray[np.int64] = load_array(directory, "edges-csr-indptr.vortex")
+    # csc_indices: NDArray[np.int32] = load_array(directory, "edges-csc-indices.vortex")
+    # csc_indptr: NDArray[np.int64] = load_array(directory, "edges-csc-indptr.vortex")
+    csr_indices: NDArray[np.int32] = load(directory, "edges-csr-indices.npy")
+    csr_indptr: NDArray[np.int64] = load(directory, "edges-csr-indptr.npy")
+    csc_indices: NDArray[np.int32] = load(directory, "edges-csc-indices.npy")
+    csc_indptr: NDArray[np.int64] = load(directory, "edges-csc-indptr.npy")
 
     (sources, targets) = find_mutual_edges(
         len(ids),
