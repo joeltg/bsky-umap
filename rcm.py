@@ -20,8 +20,6 @@ if __name__ == "__main__":
         shape=(len(ids), len(ids)),
     )
 
-    G_csr = G.tocsr()
-
     perm = reverse_cuthill_mckee(G.multiply(G.T).tocsr(), symmetric_mode=True)
     save(directory, "perm.npy", perm)
 
