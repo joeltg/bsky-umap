@@ -4,15 +4,17 @@ import numpy as np
 from numpy.typing import NDArray
 
 from alias_table import build_all_alias_tables
-from utils import load, load_array, save
+from utils import load, save
 
 if __name__ == "__main__":
     arguments = sys.argv[1:]
     directory = arguments[0]
 
     incoming_degrees: NDArray[np.uint32] = load(directory, "incoming_degrees.npy")
-    csr_indptr: NDArray[np.int64] = load_array(directory, "edges-csr-indptr.vortex")
-    csr_indices: NDArray[np.int32] = load_array(directory, "edges-csr-indices.vortex")
+    # csr_indptr: NDArray[np.int64] = load_array(directory, "edges-csr-indptr.vortex")
+    # csr_indices: NDArray[np.int32] = load_array(directory, "edges-csr-indices.vortex")
+    csr_indptr: NDArray[np.int64] = load(directory, "edges-csr-indptr.npy")
+    csr_indices: NDArray[np.int32] = load(directory, "edges-csr-indices.npy˝")
 
     print("computing csr alias table")
     csr_alias_probs, csr_alias_indices = build_all_alias_tables(
