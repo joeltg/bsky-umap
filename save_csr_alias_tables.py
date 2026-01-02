@@ -14,7 +14,7 @@ if __name__ == "__main__":
     # csr_indptr: NDArray[np.int64] = load_array(directory, "edges-csr-indptr.vortex")
     # csr_indices: NDArray[np.int32] = load_array(directory, "edges-csr-indices.vortex")
     csr_indptr: NDArray[np.int64] = load(directory, "edges-csr-indptr.npy")
-    csr_indices: NDArray[np.int32] = load(directory, "edges-csr-indices.npy˝")
+    csr_indices: NDArray[np.int32] = load(directory, "edges-csr-indices.npy")
 
     print("computing csr alias table")
     csr_alias_probs, csr_alias_indices = build_all_alias_tables(
