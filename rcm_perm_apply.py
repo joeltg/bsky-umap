@@ -6,9 +6,9 @@ if __name__ == "__main__":
     arguments = sys.argv[1:]
     directory = arguments[0]
 
-    ids = load(directory, "ids.npy")
-    sources = load(directory, "sources.npy")
-    targets = load(directory, "targets.npy")
+    ids = load(directory, "ids.npy", copy=True)
+    sources = load(directory, "sources.npy", copy=True)
+    targets = load(directory, "targets.npy", copy=True)
 
     perm = load(directory, "perm.npy")
 

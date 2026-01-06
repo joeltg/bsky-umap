@@ -8,14 +8,18 @@ License: New BSD, (C) 2014
 Rewritten in pure Python for symmetric CSR format with Numba optimization.
 """
 
+import sys
+
 import numpy as np
-from numba import jit, prange
+from numba import jit, njit, prange
 from numpy.typing import NDArray
+
+from utils import load, save
 
 
 @jit(nopython=True, parallel=True, cache=True)
 def _node_degrees(
-    indices: NDArray[np.uint32], indptr: NDArray[np.int64], num_rows: int
+    indices: NDArray[np.int32], indptr: NDArray[np.int64], num_rows: int
 ) -> NDArray[np.uint32]:
     """
     Find the degree of each node (matrix row) in a symmetric graph
@@ -54,8 +58,8 @@ def _reverse_cuthill_mckee_impl(
     indptr: NDArray[np.int64],
     num_rows: int,
     degree: NDArray[np.uint32],
-    inds: NDArray[np.uint32],
-    rev_inds: NDArray[np.uint32],
+    inds: NDArray[np.intp],
+    rev_inds: NDArray[np.intp],
 ):
     """
     Core RCM implementation with Numba optimization.
@@ -168,8 +172,6 @@ def reverse_cuthill_mckee(indices: NDArray[np.uint32], indptr: NDArray[np.int64]
         CSR indices array
     indptr : ndarray
         CSR indptr array
-    num_rows : int, optional
-        Number of rows. If None, inferred from indptr length.
 
     Returns
     -------
@@ -192,8 +194,8 @@ def reverse_cuthill_mckee(indices: NDArray[np.uint32], indptr: NDArray[np.int64]
     Examples
     --------
     >>> indices = np.array([1, 2, 3, 0, 2, 3, 0, 1, 3, 0, 1, 2], dtype=np.uint32)
-    >>> indptr = np.array([0, 2, 4, 7, 10], dtype=np.uint32)
-    >>> perm = reverse_cuthill_mckee(indices, indptr, 4)
+    >>> indptr = np.array([0, 2, 4, 7, 10], dtype=np.int64)
+    >>> perm = reverse_cuthill_mckee(indices, indptr)
     >>> print(perm)
     """
     # Ensure arrays are numpy arrays with proper dtypes
@@ -213,3 +215,36 @@ def reverse_cuthill_mckee(indices: NDArray[np.uint32], indptr: NDArray[np.int64]
     return _reverse_cuthill_mckee_impl(
         indices, indptr, num_rows, degrees, inds, rev_inds
     )
+
+
+@njit
+def compute_indptr_serial(sources: NDArray[np.int32], N: int) -> NDArray[np.int64]:
+    E = len(sources)
+    indptr = np.empty(N + 1, dtype=np.int64)
+    edge_idx = 0
+
+    for node in range(N + 1):
+        while edge_idx < E and sources[edge_idx] < node:
+            edge_idx += 1
+        indptr[node] = edge_idx
+
+    return indptr
+
+
+if __name__ == "__main__":
+    arguments = sys.argv[1:]
+    directory = arguments[0]
+
+    ids: NDArray[np.uint32] = load(directory, "ids.npy", copy=True)
+    edges: NDArray[np.int32] = load(directory, "edges-coo.npy")
+
+    indices = edges[:, 1]
+    indptr = compute_indptr_serial(edges[:, 0], len(ids))
+
+    perm = reverse_cuthill_mckee(indices, indptr)
+
+    save(directory, "id-perm.npy", perm)
+
+    # save(directory, "ids.npy", ids[perm])
+    # save(directory, "sources.npy", sources[perm])
+    # save(directory, "targets.npy", targets[perm])
