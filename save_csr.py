@@ -9,7 +9,7 @@ from utils import load, save
 
 
 @njit
-def compute_indptr_serial(sources: NDArray[np.int32], N: int) -> NDArray[np.int64]:
+def compute_indptr_serial(sources: NDArray[np.uint32], N: int) -> NDArray[np.int64]:
     E = len(sources)
     indptr = np.empty(N + 1, dtype=np.int64)
     edge_idx = 0
@@ -27,8 +27,8 @@ if __name__ == "__main__":
     directory = arguments[0]
 
     ids: NDArray[np.uint32] = load(directory, "ids.npy")
-    sources: NDArray[np.int32] = load(directory, "sources.npy")
-    targets: NDArray[np.int32] = load(directory, "targets.npy")
+    sources: NDArray[np.uint32] = load(directory, "sources.npy")
+    targets: NDArray[np.uint32] = load(directory, "targets.npy")
 
     df = pl.DataFrame({"sources": sources, "targets": targets})
 

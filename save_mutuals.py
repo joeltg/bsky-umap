@@ -10,11 +10,11 @@ from utils import load, save
 @jit(nopython=True)
 def find_mutual_edges(
     n_nodes: int,
-    csr_indices: NDArray[np.int32],
+    csr_indices: NDArray[np.uint32],
     csr_indptr: NDArray[np.int64],
-    csc_indices: NDArray[np.int32],
+    csc_indices: NDArray[np.uint32],
     csc_indptr: NDArray[np.int64],
-) -> tuple[NDArray[np.int32], NDArray[np.int32]]:
+) -> tuple[NDArray[np.uint32], NDArray[np.uint32]]:
     """Find mutual edges using sorted intersection."""
     # First pass: count mutual edges
     count = 0
@@ -37,8 +37,8 @@ def find_mutual_edges(
                 j += 1
 
     # Second pass: fill arrays
-    src = np.empty(count, dtype=np.int32)
-    dst = np.empty(count, dtype=np.int32)
+    src = np.empty(count, dtype=np.uint32)
+    dst = np.empty(count, dtype=np.uint32)
     idx = 0
     for A in range(n_nodes):
         fol_start = csr_indptr[A]
@@ -75,9 +75,9 @@ if __name__ == "__main__":
     # csr_indptr: NDArray[np.int64] = load_array(directory, "edges-csr-indptr.vortex")
     # csc_indices: NDArray[np.int32] = load_array(directory, "edges-csc-indices.vortex")
     # csc_indptr: NDArray[np.int64] = load_array(directory, "edges-csc-indptr.vortex")
-    csr_indices: NDArray[np.int32] = load(directory, "edges-csr-indices.npy")
+    csr_indices: NDArray[np.uint32] = load(directory, "edges-csr-indices.npy")
     csr_indptr: NDArray[np.int64] = load(directory, "edges-csr-indptr.npy")
-    csc_indices: NDArray[np.int32] = load(directory, "edges-csc-indices.npy")
+    csc_indices: NDArray[np.uint32] = load(directory, "edges-csc-indices.npy")
     csc_indptr: NDArray[np.int64] = load(directory, "edges-csc-indptr.npy")
 
     (sources, targets) = find_mutual_edges(
