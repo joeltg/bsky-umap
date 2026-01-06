@@ -54,13 +54,13 @@ def _node_degrees(
 
 @jit(nopython=True, cache=True)
 def _reverse_cuthill_mckee_impl(
-    indices: NDArray[np.uint32],
+    indices: NDArray[np.int32],
     indptr: NDArray[np.int64],
     num_rows: int,
     degree: NDArray[np.uint32],
     inds: NDArray[np.intp],
     rev_inds: NDArray[np.intp],
-):
+) -> NDArray[np.uint32]:
     """
     Core RCM implementation with Numba optimization.
 
@@ -157,7 +157,9 @@ def _reverse_cuthill_mckee_impl(
     return order[::-1]
 
 
-def reverse_cuthill_mckee(indices: NDArray[np.uint32], indptr: NDArray[np.int64]):
+def reverse_cuthill_mckee(
+    indices: NDArray[np.int32], indptr: NDArray[np.int64]
+) -> NDArray[np.uint32]:
     """
     Returns the permutation array that orders a sparse symmetric CSR matrix
     in Reverse-Cuthill McKee ordering.
@@ -236,15 +238,12 @@ if __name__ == "__main__":
     directory = arguments[0]
 
     ids: NDArray[np.uint32] = load(directory, "ids.npy", copy=True)
-    edges: NDArray[np.int32] = load(directory, "edges-coo.npy")
+    edges: NDArray[np.int32] = load(directory, "mutual-edges-coo.npy")
 
     indices = edges[:, 1]
     indptr = compute_indptr_serial(edges[:, 0], len(ids))
 
     perm = reverse_cuthill_mckee(indices, indptr)
 
-    save(directory, "id-perm.npy", perm)
-
-    # save(directory, "ids.npy", ids[perm])
-    # save(directory, "sources.npy", sources[perm])
-    # save(directory, "targets.npy", targets[perm])
+    save(directory, "id-rcm-perm.npy", perm)
+    save(directory, "ids-rcm.npy", ids[perm])
