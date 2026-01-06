@@ -238,7 +238,7 @@ if __name__ == "__main__":
     directory = arguments[0]
 
     ids: NDArray[np.uint32] = load(directory, "ids.npy", copy=True)
-    edges: NDArray[np.int32] = load(directory, "mutual-edges-coo.npy")
+    edges: NDArray[np.int32] = load(directory, "mutual-edges-coo.npy", copy=True)
 
     indices = edges[:, 1]
     indptr = compute_indptr_serial(edges[:, 0], len(ids))
