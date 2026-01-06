@@ -13,5 +13,5 @@ if __name__ == "__main__":
     perm = load(directory, "perm.npy")
 
     save(directory, "ids.npy", ids[perm])
-    save(directory, "sources.npy", sources[perm])
-    save(directory, "targets.npy", targets[perm])
+    save(directory, "sources.npy", perm[sources])
+    save(directory, "targets.npy", perm[targets])
