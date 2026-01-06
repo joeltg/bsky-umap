@@ -28,11 +28,11 @@ if __name__ == "__main__":
 
     ids: NDArray[np.uint32] = load(directory, "ids.npy")
 
-    # sources: NDArray[np.int32] = load(directory, "sources.npy")
-    # targets: NDArray[np.int32] = load(directory, "targets.npy")
-    edges: NDArray[np.int32] = load(directory, "edges-coo.npy")
-    sources = edges[:, 0]
-    targets = edges[:, 1]
+    sources: NDArray[np.int32] = load(directory, "sources.npy")
+    targets: NDArray[np.int32] = load(directory, "targets.npy")
+    # edges: NDArray[np.int32] = load(directory, "edges-coo.npy")
+    # sources = edges[:, 0]
+    # targets = edges[:, 1]
 
     df = pl.DataFrame({"sources": sources, "targets": targets})
 
