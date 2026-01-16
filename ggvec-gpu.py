@@ -54,18 +54,18 @@ def ggvec_attract_kernel(
     embeddings: NDArray[np.float32],
     learning_rate: float,
     max_loss: float,
-    loss_per_block: NDArray[np.float32],  # shape: (n_blocks,)
+    # loss_per_block: NDArray[np.float32],  # shape: (n_blocks,)
 ):
     n_edges = len(edges)
     n_dims = embeddings.shape[1]
 
-    shared_loss = cuda.shared.array(256, dtype=numba.float32)
+    # shared_loss = cuda.shared.array(256, dtype=numba.float32)
 
     edge_idx = cuda.grid(1)
-    tid = cuda.threadIdx.x
-    block_id = cuda.blockIdx.x
+    # tid = cuda.threadIdx.x
+    # block_id = cuda.blockIdx.x
 
-    local_loss = 0.0
+    # local_loss = 0.0
 
     if edge_idx < n_edges:
         node1 = edges[edge_idx][0]
@@ -104,23 +104,23 @@ def ggvec_attract_kernel(
             elif new2 > 1.0:
                 cuda.atomic.add(embeddings, (node2, k), 1.0 - new2)
 
-        # ... compute loss and update embeddings ...
-        local_loss += abs(loss)
+        # # ... compute loss and update embeddings ...
+        # local_loss += abs(loss)
 
     # Block reduction
-    shared_loss[tid] = local_loss
-    cuda.syncthreads()
+    # shared_loss[tid] = local_loss
+    # cuda.syncthreads()
 
-    s = cuda.blockDim.x // 2
-    while s > 0:
-        if tid < s:
-            shared_loss[tid] += shared_loss[tid + s]
-        cuda.syncthreads()
-        s //= 2
+    # s = cuda.blockDim.x // 2
+    # while s > 0:
+    #     if tid < s:
+    #         shared_loss[tid] += shared_loss[tid + s]
+    #     cuda.syncthreads()
+    #     s //= 2
 
-    # No atomic needed!
-    if tid == 0:
-        loss_per_block[block_id] = shared_loss[0]
+    # # No atomic needed!
+    # if tid == 0:
+    #     loss_per_block[block_id] = shared_loss[0]
 
 
 @cuda.jit
@@ -251,12 +251,12 @@ def ggvec_cuda_main(
     attract_blocks = (n_edges + threads_per_block - 1) // threads_per_block
     repel_blocks = (n_neg_samples + threads_per_block - 1) // threads_per_block
 
-    d_loss = cuda.to_device(np.zeros(attract_blocks, dtype=np.float32))
+    # d_loss = cuda.to_device(np.zeros(attract_blocks, dtype=np.float32))
 
     epoch_range = tqdm.trange(max_epoch)
     for epoch in epoch_range:
         # Reset loss accumulator
-        d_loss.copy_to_device(np.zeros(attract_blocks, dtype=np.float32))
+        # d_loss.copy_to_device(np.zeros(attract_blocks, dtype=np.float32))
 
         # Repulsion pass
         ggvec_repel_kernel[repel_blocks, threads_per_block](
@@ -273,12 +273,12 @@ def ggvec_cuda_main(
             d_embeddings,
             learning_rate,
             max_loss,
-            d_loss,
+            # d_loss,
         )
 
         # Get loss for monitoring
-        loss = d_loss.copy_to_host().sum() / n_edges
-        epoch_range.set_description(f"[Loss: {loss:.4f}]")
+        # loss = d_loss.copy_to_host().sum() / n_edges
+        # epoch_range.set_description(f"[Loss: {loss:.4f}]")
 
     return d_embeddings.copy_to_host()
 
