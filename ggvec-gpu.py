@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from numba import cuda
 from numpy.typing import NDArray
 
-from utils import load, load_coo_array, save
+from utils import load, save
 
 load_dotenv()
 
@@ -318,10 +318,10 @@ if __name__ == "__main__":
 
     ids = load(directory, "ids.npy")
 
-    (sources, targets) = load_coo_array(directory, "mutual-edges-coo.vortex")
+    edges = load(directory, "mutual-edges-coo.npy")
 
     embeddings = ggvec_cuda_main(
-        len(ids), sources, targets, n_components=dim, **ggvec_kwargs
+        len(ids), edges[:, 0], edges[:, 1], n_components=dim, **ggvec_kwargs
     )
 
     save(directory, f"embeddings-{dim}-euclidean.npy", embeddings)
