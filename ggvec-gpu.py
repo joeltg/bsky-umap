@@ -50,14 +50,13 @@ def random_int_range(state, max_val):
 
 @cuda.jit
 def ggvec_attract_kernel(
-    src: NDArray[np.int32],
-    dst: NDArray[np.int32],
+    edges: NDArray[np.int32],
     embeddings: NDArray[np.float32],
     learning_rate: float,
     max_loss: float,
     loss_per_block: NDArray[np.float32],  # shape: (n_blocks,)
 ):
-    n_edges = src.shape[0]
+    n_edges = len(edges)
     n_dims = embeddings.shape[1]
 
     shared_loss = cuda.shared.array(256, dtype=numba.float32)
@@ -69,8 +68,8 @@ def ggvec_attract_kernel(
     local_loss = 0.0
 
     if edge_idx < n_edges:
-        node1 = src[edge_idx]
-        node2 = dst[edge_idx]
+        node1 = edges[edge_idx][0]
+        node2 = edges[edge_idx][1]
 
         # Compute dot product
         dot = 0.0
@@ -198,8 +197,7 @@ def ggvec_repel_kernel(
 
 def ggvec_cuda_main(
     n_nodes: int,
-    src: NDArray[np.int32],
-    dst: NDArray[np.int32],
+    edges: NDArray[np.int32],
     n_components: int = 64,
     learning_rate: float = 0.05,
     negative_ratio: float = 0.15,
@@ -214,7 +212,7 @@ def ggvec_cuda_main(
     -----------
     n_nodes : int
         Number of nodes.
-    src, dst : NDArray[np.int32]
+    edges: NDArray[np.int32]
         Edge list in COO format.
     n_components : int
         Embedding dimension.
@@ -234,7 +232,7 @@ def ggvec_cuda_main(
     embeddings : NDArray[np.float32]
         Node embeddings of shape (n_nodes, n_components).
     """
-    n_edges = len(src)
+    n_edges = len(edges)
     n_neg_samples = int(n_edges * negative_ratio)
 
     # Initialize embeddings
@@ -245,8 +243,7 @@ def ggvec_cuda_main(
     rng_states = np.arange(max_threads, dtype=np.uint64) + np.uint64(42)
 
     # Copy to device
-    d_src = cuda.to_device(src)
-    d_dst = cuda.to_device(dst)
+    d_edges = cuda.to_device(edges)
     d_embeddings = cuda.to_device(embeddings)
     d_rng_states = cuda.to_device(rng_states)
 
@@ -272,8 +269,7 @@ def ggvec_cuda_main(
 
         # Attraction pass
         ggvec_attract_kernel[attract_blocks, threads_per_block](
-            d_src,
-            d_dst,
+            d_edges,
             d_embeddings,
             learning_rate,
             max_loss,
@@ -320,8 +316,6 @@ if __name__ == "__main__":
 
     edges = load(directory, "mutual-edges-coo.npy")
 
-    embeddings = ggvec_cuda_main(
-        len(ids), edges[:, 0], edges[:, 1], n_components=dim, **ggvec_kwargs
-    )
+    embeddings = ggvec_cuda_main(len(ids), edges, n_components=dim, **ggvec_kwargs)
 
     save(directory, f"embeddings-{dim}-euclidean.npy", embeddings)
