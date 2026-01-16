@@ -1,7 +1,7 @@
 import os
 import sys
 import warnings
-from typing import Literal, cast
+from typing import Literal
 
 import numba
 import numpy as np
@@ -80,15 +80,8 @@ def get_degree(indptr: NDArray[np.int64], node: int) -> int:
     return indptr[node + 1] - indptr[node]
 
 
-###########################
-#                         #
-#    Euclidean metric     #
-#                         #
-###########################
-
-
 @jit(nopython=True, nogil=True, fastmath=True, parallel=True)
-def nnvec_edges_update_euclidean(
+def nnvec_edges_update(
     n_nodes: int,
     csr_indices: NDArray[np.int32],
     csr_indptr: NDArray[np.int64],
@@ -199,7 +192,7 @@ def nnvec_edges_update_euclidean(
 
 
 @jit(nopython=True, nogil=True, fastmath=True, parallel=True)
-def nnvec_reverse_euclidean(
+def nnvec_reverse(
     n_edges: int,
     w: NDArray[np.float32],
     b: NDArray[np.float32],
@@ -220,117 +213,6 @@ def nnvec_reverse_euclidean(
         node2 = np.random.randint(0, nnodes)
         # We assume no edge (weight = 0) between nodes on negative sampling pass
         loss = np.dot(w[node1], w[node2]) + b[node1] + b[node2]
-        loss = min(loss, max_loss)
-        loss = max(loss, -max_loss)
-        update_wgrad_clipped(learning_rate, loss, w[node1], w[node2])
-        update_wgrad_clipped(learning_rate, loss, w[node2], w[node1])
-        b[node1] -= learning_rate * loss
-        b[node2] -= learning_rate * loss
-
-
-###########################
-#                         #
-#    Cosine metric        #
-#                         #
-###########################
-
-
-@jit(nopython=True, nogil=True, fastmath=True, parallel=True)
-def nnvec_edges_update_cosine(
-    n_nodes: int,
-    csr_indices: NDArray[np.int32],
-    csr_indptr: NDArray[np.int64],
-    csr_alias_probs: NDArray[np.uint16],
-    csr_alias_indices: NDArray[np.int32],
-    csc_indices: NDArray[np.int32],
-    csc_indptr: NDArray[np.int64],
-    csc_alias_probs: NDArray[np.uint16],
-    csc_alias_indices: NDArray[np.int32],
-    # mutual_sources: NDArray[np.int32],
-    # mutual_targets: NDArray[np.int32],
-    mutual_edges: NDArray[np.int32],
-    mutual_degrees: NDArray[np.uint32],
-    w: NDArray[np.float32],
-    b: NDArray[np.float32],
-    learning_rate=0.01,
-    exponent=0.5,
-    max_loss=10.0,
-) -> float:
-    """
-    Cosine similarity metric version.
-    Uses cosine similarity normalized by vector magnitudes.
-    """
-    # (n_edges,) = weights.shape
-    # (src, dst) = coords
-    # total_loss = 0.0
-    # for edge in numba.prange(n_edges):
-    #     node2 = dst[edge]
-    #     node1 = src[edge]
-    #     # Compute cosine similarity
-    #     dot_product = np.dot(w[node1], w[node2])
-    #     norm1_sq = np.dot(w[node1], w[node1])
-    #     norm2_sq = np.dot(w[node2], w[node2])
-    #     norm1 = np.sqrt(norm1_sq)
-    #     norm2 = np.sqrt(norm2_sq)
-
-    #     # Avoid division by zero
-    #     if norm1 < 1e-8 or norm2 < 1e-8:
-    #         cosine = 0.0
-    #     else:
-    #         cosine = dot_product / (norm1 * norm2)
-
-    #     # Add biases to preserve degree information
-    #     pred = cosine + b[node1] + b[node2]
-
-    #     loss = pred - weights[edge] ** exponent
-    #     # Clip the loss for numerical stability.
-    #     if loss < -max_loss:
-    #         loss = -max_loss
-    #     elif loss > max_loss:
-    #         loss = max_loss
-    #     # Update weights
-    #     update_wgrad_clipped(learning_rate, loss, w[node1], w[node2])
-    #     update_wgrad_clipped(learning_rate, loss, w[node2], w[node1])
-    #     # Update biases
-    #     b[node1] -= learning_rate * loss
-    #     b[node2] -= learning_rate * loss
-    #     # track losses for early stopping
-    #     total_loss = total_loss + np.abs(loss)
-    # return total_loss / n_edges
-    return 0.0
-
-
-@jit(nopython=True, nogil=True, fastmath=True, parallel=True)
-def nnvec_reverse_cosine(
-    n_edges: int,
-    w: NDArray[np.float32],
-    b: NDArray[np.float32],
-    learning_rate=0.01,
-    max_loss=10.0,
-):
-    """
-    Negative sampling NNVec pass (Cosine similarity version)
-    """
-    nnodes = w.shape[0]
-    for _ in numba.prange(n_edges):
-        node1 = np.random.randint(0, nnodes)
-        node2 = np.random.randint(0, nnodes)
-
-        # Compute cosine similarity
-        dot_product = np.dot(w[node1], w[node2])
-        norm1_sq = np.dot(w[node1], w[node1])
-        norm2_sq = np.dot(w[node2], w[node2])
-        norm1 = np.sqrt(norm1_sq)
-        norm2 = np.sqrt(norm2_sq)
-
-        # Avoid division by zero
-        if norm1 < 1e-8 or norm2 < 1e-8:
-            cosine = 0.0
-        else:
-            cosine = dot_product / (norm1 * norm2)
-
-        # We assume no edge (weight = 0) between nodes on negative sampling pass
-        loss = cosine + b[node1] + b[node2]
         loss = min(loss, max_loss)
         loss = max(loss, -max_loss)
         update_wgrad_clipped(learning_rate, loss, w[node1], w[node2])
@@ -378,7 +260,6 @@ def nnvec_main(
     exponent=0.5,
     max_loss=30.0,
     max_epoch=500,
-    metric: Literal["euclidean", "cosine"] = "euclidean",
 ):
     """
     NNVec: Fast global first (and higher) order local embeddings.
@@ -419,23 +300,9 @@ def nnvec_main(
         Optimization learning rate.
     max_loss : float
         Loss value ceiling for numerical stability.
-    metric : "euclidean" or "cosine"
-        Distance metric to use for computing similarity.
-        "euclidean" uses dot product (default, faster).
-        "cosine" uses cosine similarity (normalized, better for power-law graphs).
     """
     if tol == "auto":
         tol = max(learning_rate / 2, 0.05)
-
-    # Select metric-specific functions
-    if metric == "euclidean":
-        nnvec_edges_update = nnvec_edges_update_euclidean
-        nnvec_reverse = nnvec_reverse_euclidean
-    elif metric == "cosine":
-        nnvec_edges_update = nnvec_edges_update_cosine
-        nnvec_reverse = nnvec_reverse_cosine
-    else:
-        raise ValueError(f"Unknown metric: {metric}. Must be 'euclidean' or 'cosine'")
 
     w: NDArray[np.float32] = (
         np.random.rand(n_nodes, n_components).astype(np.float32) - 0.5
@@ -509,10 +376,8 @@ def nnvec_main(
 
 if __name__ == "__main__":
     assert "DIM" in os.environ
-    assert "METRIC" in os.environ
 
     dim = int(os.environ["DIM"])
-    metric = cast(Literal["cosine", "euclidean"], os.environ["METRIC"])
 
     # Build kwargs for nnvec parameters from environment variables
     nnvec_kwargs = {}
@@ -540,10 +405,6 @@ if __name__ == "__main__":
 
     directory = arguments[0]
 
-    # csr_indices = load_array(directory, "edges-csr-indices.vortex")
-    # csr_indptr = load_array(directory, "edges-csr-indptr.vortex")
-    # csr_alias_probs = load_array(directory, "edges-csr-alias-probs.vortex")
-    # csr_alias_indices = load_array(directory, "edges-csr-alias-indices.vortex")
     csr_indices: NDArray[np.int32] = load(directory, "edges-csr-indices.npy")
     csr_indptr: NDArray[np.int64] = load(directory, "edges-csr-indptr.npy")
     csr_alias_probs: NDArray[np.uint16] = load(directory, "edges-csr-alias-probs.npy")
@@ -551,10 +412,6 @@ if __name__ == "__main__":
         directory, "edges-csr-alias-indices.npy"
     )
 
-    # csc_indices = load_array(directory, "edges-csc-indices.vortex")
-    # csc_indptr = load_array(directory, "edges-csc-indptr.vortex")
-    # csc_alias_probs = load_array(directory, "edges-csc-alias-probs.vortex")
-    # csc_alias_indices = load_array(directory, "edges-csc-alias-indices.vortex")
     csc_indices: NDArray[np.int32] = load(directory, "edges-csc-indices.npy")
     csc_indptr: NDArray[np.int64] = load(directory, "edges-csc-indptr.npy")
     csc_alias_probs: NDArray[np.uint16] = load(directory, "edges-csc-alias-probs.npy")
@@ -562,12 +419,6 @@ if __name__ == "__main__":
         directory, "edges-csc-alias-indices.npy"
     )
 
-    # (mutual_sources, mutual_targets) = load_coo_array(
-    #     directory, "mutual-edges-coo.vortex"
-    # )
-    # mutual_degrees = load_array(directory, "mutual-degrees.vortex")
-    # mutual_sources = load(directory, "mutual-edges-sources.npy")
-    # mutual_targets = load(directory, "mutual-edges-targets.npy")
     mutual_edges: NDArray[np.int32] = load(directory, "mutual-edges-coo.npy")
     mutual_degrees: NDArray[np.uint32] = load(directory, "mutual-degrees.npy")
 
@@ -586,10 +437,9 @@ if __name__ == "__main__":
         mutual_edges=mutual_edges,
         mutual_degrees=mutual_degrees,
         n_components=dim,
-        metric=metric,
         # max_epoch=500,
         # tol_samples=500,
         **nnvec_kwargs,
     )
 
-    save(directory, f"embeddings-{dim}-nnvec-{metric}.npy", embeddings)
+    save(directory, f"embeddings-{dim}.npy", embeddings)

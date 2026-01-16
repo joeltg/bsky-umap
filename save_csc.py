@@ -30,9 +30,6 @@ if __name__ == "__main__":
 
     sources: NDArray[np.int32] = load(directory, "sources.npy")
     targets: NDArray[np.int32] = load(directory, "targets.npy")
-    # edges: NDArray[np.int32] = load(directory, "edges-coo.npy")
-    # sources = edges[:, 0]
-    # targets = edges[:, 1]
 
     df = pl.DataFrame({"sources": sources, "targets": targets})
 
@@ -40,11 +37,9 @@ if __name__ == "__main__":
     df = df.sort(["targets", "sources"])
 
     csc_indices = df["sources"].to_numpy()
-    # save_array(directory, "edges-csc-indices.vortex", csc_indices)
     save(directory, "edges-csc-indices.npy", csc_indices)
 
     print("Computing CSC indptr...")
     csc_indptr = compute_indptr_serial(df["targets"].to_numpy(), len(ids))
 
-    # save_array(directory, "edges-csc-indptr.vortex", csc_indptr)
     save(directory, "edges-csc-indptr.npy", csc_indptr)

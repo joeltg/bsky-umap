@@ -68,40 +68,32 @@ if __name__ == "__main__":
 
     directory = arguments[0]
 
-    ids: NDArray[np.uint32] = load(directory, "ids.npy")
-
-    # csr_indices: NDArray[np.int32] = load_array(directory, "edges-csr-indices.vortex")
-    # csr_indptr: NDArray[np.int64] = load_array(directory, "edges-csr-indptr.vortex")
-    # csc_indices: NDArray[np.int32] = load_array(directory, "edges-csc-indices.vortex")
-    # csc_indptr: NDArray[np.int64] = load_array(directory, "edges-csc-indptr.vortex")
     csr_indices: NDArray[np.int32] = load(directory, "edges-csr-indices.npy")
     csr_indptr: NDArray[np.int64] = load(directory, "edges-csr-indptr.npy")
     csc_indices: NDArray[np.int32] = load(directory, "edges-csc-indices.npy")
     csc_indptr: NDArray[np.int64] = load(directory, "edges-csc-indptr.npy")
 
+    assert csr_indices.shape == csc_indices.shape
+    assert csr_indptr.shape == csc_indptr.shape
+    n_nodes = len(csr_indptr) - 1
+
     mutuals = find_mutual_edges(
-        len(ids),
+        n_nodes,
         csr_indices=csr_indices,
         csr_indptr=csr_indptr,
         csc_indices=csc_indices,
         csc_indptr=csc_indptr,
     )
 
-    # assert sources.shape == targets.shape and sources.dtype == targets.dtype
     print("found mutuals", mutuals.shape)
 
-    outgoing_degrees = np.bincount(mutuals[:, 0], minlength=len(ids))
-    incoming_degrees = np.bincount(mutuals[:, 1], minlength=len(ids))
+    outgoing_degrees = np.bincount(mutuals[:, 0], minlength=n_nodes)
+    incoming_degrees = np.bincount(mutuals[:, 1], minlength=n_nodes)
 
     assert np.array_equal(outgoing_degrees, incoming_degrees)
     degrees = outgoing_degrees.astype(np.uint32)
 
     # upper_triangle_mask = sources < targets
 
-    # save(directory, "mutual-edges-sources.npy", sources)
-    # save(directory, "mutual-edges-targets.npy", targets)
     save(directory, "mutual-edges-coo.npy", mutuals)
     save(directory, "mutual-degrees.npy", degrees)
-
-    # save_coo_array(directory, "mutual-edges-coo.vortex", (sources, targets))
-    # save_array(directory, "mutual-degrees.vortex", degrees)

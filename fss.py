@@ -17,7 +17,6 @@ def main():
     dim = int(os.environ["DIM"])
     n_neighbors = int(os.environ["N_NEIGHBORS"])
     n_threads = int(os.environ["N_THREADS"])
-    metric = os.environ["METRIC"]
 
     numba.set_num_threads(n_threads)
 
@@ -27,7 +26,7 @@ def main():
 
     directory = arguments[0]
 
-    knn_path = os.path.join(directory, f"knn-{dim}-{metric}-{n_neighbors}.arrow")
+    knn_path = os.path.join(directory, f"knn-{dim}-{n_neighbors}.arrow")
     with KNNReader(knn_path, n_neighbors) as reader:
         neighbor_graph = reader.get_knn()
 
@@ -50,7 +49,7 @@ def main():
     assert rows.dtype == np.int32
     assert cols.dtype == np.int32
 
-    path = os.path.join(directory, f"fss-{dim}-{metric}-{n_neighbors}.arrow")
+    path = os.path.join(directory, f"fss-{dim}-{n_neighbors}.arrow")
 
     edges = (
         cast(NDArray[np.float32], fss.data),

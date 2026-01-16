@@ -30,9 +30,6 @@ if __name__ == "__main__":
 
     sources: NDArray[np.int32] = load(directory, "sources.npy")
     targets: NDArray[np.int32] = load(directory, "targets.npy")
-    # edges: NDArray[np.int32] = load(directory, "edges-coo.npy")
-    # sources = edges[:, 0]
-    # targets = edges[:, 1]
 
     df = pl.DataFrame({"sources": sources, "targets": targets})
 
@@ -41,10 +38,8 @@ if __name__ == "__main__":
 
     csr_indices = df["targets"].to_numpy()
     save(directory, "edges-csr-indices.npy", csr_indices)
-    # save_array(directory, "edges-csr-indices.vortex", csr_indices)
 
     print("Computing CSR indptr...")
     csr_indptr = compute_indptr_serial(df["sources"].to_numpy(), len(ids))
 
-    # save_array(directory, "edges-csr-indptr.vortex", csr_indptr)
     save(directory, "edges-csr-indptr.npy", csr_indptr)

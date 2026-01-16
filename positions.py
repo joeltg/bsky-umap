@@ -20,7 +20,6 @@ def main():
     n_threads = int(os.environ["N_THREADS"])
     spread = float(os.environ["SPREAD"])
     min_dist = float(os.environ["MIN_DIST"])
-    metric = os.environ["METRIC"]
 
     numba.set_num_threads(n_threads)
 
@@ -30,9 +29,9 @@ def main():
 
     directory = arguments[0]
 
-    X: NDArray[np.float32] = load(directory, f"embeddings-{dim}-{metric}.npy")
+    X: NDArray[np.float32] = load(directory, f"embeddings-{dim}.npy")
 
-    fss_path = os.path.join(directory, f"fss-{dim}-{metric}-{n_neighbors}.arrow")
+    fss_path = os.path.join(directory, f"fss-{dim}-{n_neighbors}.arrow")
     with EdgeReader(fss_path) as reader:
         (vals, rows, cols) = reader.get_edges()
 
@@ -52,7 +51,7 @@ def main():
         optimize="cpu",
     )
 
-    save(directory, f"positions-{dim}-{metric}-{n_neighbors}.npy", positions)
+    save(directory, f"positions-{dim}-{n_neighbors}.npy", positions)
 
 
 if __name__ == "__main__":

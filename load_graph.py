@@ -45,8 +45,8 @@ def main():
         edge_count = count(cursor, "edges")
         print(f"Number of edges: {edge_count}")
 
-        rows = np.zeros(edge_count, dtype=np.uint32)
-        cols = np.zeros(edge_count, dtype=np.uint32)
+        sources = np.zeros(edge_count, dtype=np.uint32)
+        targets = np.zeros(edge_count, dtype=np.uint32)
 
         chunk_size = 1_000_000
         edge_rowid = 0
@@ -60,8 +60,8 @@ def main():
                 i = start_idx + offset
                 s = id_to_index[source]
                 t = id_to_index[target]
-                rows[i] = s
-                cols[i] = t
+                sources[i] = s
+                targets[i] = t
                 outgoing_degrees[s] += 1
                 incoming_degrees[t] += 1
                 edge_rowid = rowid
@@ -70,8 +70,8 @@ def main():
         conn.close()
 
     save(directory, "ids.npy", ids)
-    save(directory, "sources.npy", rows)
-    save(directory, "targets.npy", cols)
+    save(directory, "sources.npy", sources)
+    save(directory, "targets.npy", targets)
     save(directory, "incoming_degrees.npy", incoming_degrees)
     save(directory, "outgoing_degrees.npy", outgoing_degrees)
 

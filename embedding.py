@@ -2,11 +2,12 @@ import os
 import sys
 
 import numba
+import numpy as np
 import scipy
 from dotenv import load_dotenv
 
 from ggvec.ggvec import ggvec_main
-from utils import EdgeReader, NodeReader, save
+from utils import load, save
 
 load_dotenv()
 
@@ -16,8 +17,6 @@ def main():
 
     # Build kwargs for ggvec parameters from environment variables
     ggvec_kwargs = {}
-    if "METRIC" in os.environ:
-        ggvec_kwargs["metric"] = float(os.environ["METRIC"])
     if "LEARNING_RATE" in os.environ:
         ggvec_kwargs["learning_rate"] = float(os.environ["LEARNING_RATE"])
     if "NEGATIVE_RATIO" in os.environ:
@@ -42,16 +41,13 @@ def main():
 
     directory = arguments[0]
 
-    nodes_path = os.path.join(directory, "nodes.arrow")
-    with NodeReader(nodes_path) as reader:
-        (ids, incoming_degrees, outgoing_degrees) = reader.get_nodes()
+    ids = load(directory, "ids.npy")
 
-    edges_path = os.path.join(directory, "edges.arrow")
-    with EdgeReader(edges_path) as reader:
-        (weights, sources, targets) = reader.get_edges()
+    edges = load(directory, "edges-mutual-coo.npy")
+    weights = np.ones(len(edges), dtype=np.float32)
 
     G = scipy.sparse.coo_array(
-        (weights, (sources, targets)), shape=(len(ids), len(ids))
+        (weights, (edges[:, 0], edges[:, 1])), shape=(len(ids), len(ids))
     )
 
     embeddings = ggvec_main(G, n_components=dim, **ggvec_kwargs)
